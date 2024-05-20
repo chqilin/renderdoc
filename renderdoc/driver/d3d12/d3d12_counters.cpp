@@ -498,7 +498,8 @@ struct D3D12GPUTimerCallback : public D3D12ActionCallback
   rdcarray<rdcpair<uint32_t, uint32_t> > m_AliasEvents;
 };
 
-rdcarray<CounterResult> D3D12Replay::FetchCounters(const rdcarray<GPUCounter> &counters)
+rdcarray<CounterResult> D3D12Replay::FetchCounters(const rdcarray<GPUCounter> &counters,
+                                                   const rdcarray<uint8_t> &eventMask)
 {
   uint32_t maxEID = m_pDevice->GetQueue()->GetMaxEID();
 

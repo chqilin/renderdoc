@@ -177,6 +177,9 @@ private:
 
   rdcarray<APIEvent> m_CurEvents, m_Events;
   bool m_AddedAction;
+  // L2-qilincheng: Begin
+  std::function<bool(int32_t)> m_EventPredicate;
+  // L2-qilincheng: End
 
   WrappedID3DUserDefinedAnnotation m_UserAnnotation;
   int32_t m_MarkerIndentLevel;
@@ -299,6 +302,12 @@ public:
   WriteSerialiser &GetScratchSerialiser() { return m_ScratchSerialiser; }
   bool IsFL11_1();
 
+  // L2-qilincheng: Begin
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate)
+  {
+    m_EventPredicate = predicate;
+  }
+  // L2-qilincheng: End
   bool ProcessChunk(ReadSerialiser &ser, D3D11Chunk chunk);
   void ReplayFakeContext(ResourceId id);
   RDResult ReplayLog(CaptureState readType, uint32_t startEventID, uint32_t endEventID, bool partial);

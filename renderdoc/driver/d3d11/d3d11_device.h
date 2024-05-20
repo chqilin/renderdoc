@@ -777,6 +777,9 @@ public:
   RDResult ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
   bool ProcessChunk(ReadSerialiser &ser, D3D11Chunk context);
   void ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLogType replayType);
+  // L2-qilincheng: Begin
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate);
+  // L2-qilincheng: End
 
   ////////////////////////////////////////////////////////////////
   // 'fake' interfaces

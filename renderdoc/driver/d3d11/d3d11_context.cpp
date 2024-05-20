@@ -1314,7 +1314,23 @@ RDResult WrappedID3D11DeviceContext::ReplayLog(CaptureState readType, uint32_t s
 
     m_ChunkMetadata = ser.ChunkMetadata();
 
-    bool success = ProcessChunk(ser, chunktype);
+    // L2-qilincheng: Begin
+    bool success = true;
+
+    bool bNeedProcessChunk = true;
+    if(static_cast<int32_t>(chunktype) >= (int32_t)SystemChunk::FirstDriverChunk)
+    {
+      if(m_EventPredicate && !m_EventPredicate(m_CurEventID))
+      {
+        bNeedProcessChunk = false;
+      }
+    }
+    
+    if(bNeedProcessChunk)
+    {
+      success = ProcessChunk(ser, chunktype);
+    }
+    // L2-qilincheng: End
 
     ser.EndChunk();
 

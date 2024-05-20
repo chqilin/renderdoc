@@ -154,6 +154,10 @@ public:
     return ret;
   }
 
+  // L2-qilincheng: Begin
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate);
+  // L2-qilincheng: End
+
   AMDRGPControl *GetRGPControl() { return m_RGP; }
   uint64_t MakeOutputWindow(WindowingData window, bool depth);
   void DestroyOutputWindow(uint64_t id);
@@ -206,7 +210,8 @@ public:
 
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
-  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters);
+  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
+                                        const rdcarray<uint8_t> &eventMask);
 
   ResourceId CreateProxyTexture(const TextureDescription &templateTex);
   void SetProxyTextureData(ResourceId texid, const Subresource &sub, byte *data, size_t dataSize);

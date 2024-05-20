@@ -1009,6 +1009,16 @@ private:
     return m_ActionStack;
   }
 
+  // L2-qilincheng: Begin
+  int32_t m_EventCount;
+  int32_t m_SimulationCount;
+  rdcarray<uint8_t> m_EventMask;
+  void SetEventMask(const rdcarray<uint8_t> &eventMask) 
+  {
+    m_EventMask = eventMask;
+  }
+  // L2-qilincheng: End
+
   bool ProcessChunk(ReadSerialiser &ser, VulkanChunk chunk);
   RDResult ContextReplayLog(CaptureState readType, uint32_t startEventID, uint32_t endEventID,
                             bool partial);

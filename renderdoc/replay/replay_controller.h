@@ -171,12 +171,12 @@ public:
   void ReplaceResource(ResourceId from, ResourceId to);
   void RemoveReplacement(ResourceId id);
   void FreeTargetResource(ResourceId id);
-
+  
   FrameDescription GetFrameInfo();
   const SDFile &GetStructuredFile();
   const rdcarray<ActionDescription> &GetRootActions();
   void AddFakeMarkers();
-  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters);
+  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters, const rdcarray<uint8_t>& eventMask);
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
   const rdcarray<TextureDescription> &GetTextures();

@@ -192,7 +192,8 @@ public:
 
   virtual rdcarray<GPUCounter> EnumerateCounters() = 0;
   virtual CounterDescription DescribeCounter(GPUCounter counterID) = 0;
-  virtual rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counterID) = 0;
+  virtual rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counterID,
+                                                const rdcarray<uint8_t> &eventMask) = 0;
 
   virtual void FillCBufferVariables(ResourceId pipeline, ResourceId shader, ShaderStage stage,
                                     rdcstr entryPoint, uint32_t cbufSlot,
@@ -228,6 +229,7 @@ public:
 class IReplayDriver : public IRemoteDriver
 {
 public:
+
   virtual bool IsRemoteProxy() = 0;
 
   virtual IReplayDriver *MakeDummyDriver() = 0;

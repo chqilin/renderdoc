@@ -568,7 +568,8 @@ rdcarray<CounterResult> GLReplay::FetchCountersARM(const rdcarray<GPUCounter> &c
   return ret;
 }
 
-rdcarray<CounterResult> GLReplay::FetchCounters(const rdcarray<GPUCounter> &allCounters)
+rdcarray<CounterResult> GLReplay::FetchCounters(const rdcarray<GPUCounter> &allCounters,
+                                                const rdcarray<uint8_t> &eventMask)
 {
   rdcarray<CounterResult> ret;
 

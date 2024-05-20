@@ -91,7 +91,8 @@ public:
 
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
-  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counterID);
+  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counterID,
+                                        const rdcarray<uint8_t> &eventMask);
 
   void FillCBufferVariables(ResourceId pipeline, ResourceId shader, ShaderStage stage,
                             rdcstr entryPoint, uint32_t cbufSlot, rdcarray<ShaderVariable> &outvars,

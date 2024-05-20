@@ -2148,6 +2148,7 @@ struct TestsFailedCallback : public VulkanPixelHistoryCallback
   {
   }
   void PreEndCommandBuffer(VkCommandBuffer cmd) {}
+
   bool HasEventFlags(uint32_t eventId) { return m_EventFlags.find(eventId) != m_EventFlags.end(); }
   uint32_t GetEventFlags(uint32_t eventId)
   {

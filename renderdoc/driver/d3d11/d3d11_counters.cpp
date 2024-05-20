@@ -295,7 +295,10 @@ void D3D11Replay::FillTimers(D3D11CounterContext &ctx, const ActionDescription &
       m_pImmediateContext->GetReal()->Begin(timer->occlusion);
     if(timer->before && timer->after)
       m_pImmediateContext->GetReal()->End(timer->before);
-    m_pDevice->ReplayLog(ctx.eventStart, a.eventId, eReplay_OnlyDraw);
+    if(m_EventPredicate && m_EventPredicate(a.eventId))
+    {
+      m_pDevice->ReplayLog(ctx.eventStart, a.eventId, eReplay_OnlyDraw);
+    }
     if(timer->before && timer->after)
       m_pImmediateContext->GetReal()->End(timer->after);
     if(timer->occlusion)
@@ -576,7 +579,8 @@ rdcarray<CounterResult> D3D11Replay::FetchCountersIntel(const rdcarray<GPUCounte
   return m_pIntelCounters->GetCounterData(eventIDs, counters);
 }
 
-rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &counters)
+rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &counters,
+                                                   const rdcarray<uint8_t> &eventMask)
 {
   rdcarray<CounterResult> ret;
 
@@ -674,8 +678,11 @@ rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &c
   }
 
   D3D11CounterContext ctx;
+  
+  ID3D11Query *durationBefore = NULL;
+  ID3D11Query *durationAfter = NULL;
 
-  {
+  {  
     {
       m_pImmediateContext->Begin(disjoint);
 
@@ -684,6 +691,8 @@ rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &c
       ctx.eventStart = 0;
       FillTimers(ctx, m_pImmediateContext->GetRootDraw());
 
+      FetchDuration(m_pImmediateContext->GetRootDraw(), &durationBefore, &durationAfter);
+      
       m_pImmediateContext->End(disjoint);
     }
 
@@ -825,6 +834,35 @@ rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &c
           }
         }
       }
+
+      // L2-qilincheng: Begin
+      // pass duration
+      {
+        double duration = 0;
+
+        auto before = durationBefore;
+        auto after = durationAfter;
+        if(before && after)
+        {
+          UINT64 x = 0;
+          hr = m_pImmediateContext->GetReal()->GetData(before, &x, sizeof(UINT64), 0);
+          RDCASSERTEQUAL(hr, S_OK);
+
+          UINT64 y = 0;
+          hr = m_pImmediateContext->GetReal()->GetData(after, &y, sizeof(UINT64), 0);
+          RDCASSERTEQUAL(hr, S_OK);
+
+          duration = double(y - x) / ticksToSecs;
+        }
+
+        CounterResult result;
+        result.eventId = 0;
+        result.counter = GPUCounter::EventGPUDuration;
+        result.value.d = duration;
+
+        ret.push_back(result);
+      }
+      // L2-qilincheng: End
     }
   }
 
@@ -836,8 +874,68 @@ rdcarray<CounterResult> D3D11Replay::FetchCounters(const rdcarray<GPUCounter> &c
     SAFE_RELEASE(ctx.timers[i].occlusion);
   }
 
+  SAFE_RELEASE(durationBefore);
+  SAFE_RELEASE(durationAfter);
+
   SAFE_RELEASE(disjoint);
   SAFE_RELEASE(start);
 
   return ret;
+}
+
+void D3D11Replay::FetchDuration(const ActionDescription &actionnode, ID3D11Query **pBefore,
+                                    ID3D11Query **pAfter)
+{
+  uint32_t beginEvent = 0;
+  uint32_t endEvent = 0;
+  GetEventRange(actionnode, beginEvent, endEvent);
+
+  const D3D11_QUERY_DESC qtimedesc = {D3D11_QUERY_TIMESTAMP, 0};
+
+  HRESULT hr = S_OK;
+
+  ID3D11Query *before = NULL;
+  ID3D11Query *after = NULL;
+
+  hr = m_pDevice->GetReal()->CreateQuery(&qtimedesc, &before);
+  m_pDevice->CheckHRESULT(hr);
+  RDCASSERTEQUAL(hr, S_OK);
+  hr = m_pDevice->GetReal()->CreateQuery(&qtimedesc, &after);
+  m_pDevice->CheckHRESULT(hr);
+  RDCASSERTEQUAL(hr, S_OK);
+
+  if(before && after)
+    m_pImmediateContext->GetReal()->End(before);
+
+  m_pDevice->ReplayLog(0, endEvent, eReplay_Full);
+
+  if(before && after)
+    m_pImmediateContext->GetReal()->End(after);
+
+  SerializeImmediateContext();
+
+  *pBefore = before;
+  *pAfter = after;
+}
+
+void D3D11Replay::GetEventRange(const ActionDescription &actionnode, uint32_t &beginEvent,
+                                uint32_t &endEvent)
+{
+  if(actionnode.children.empty())
+    return;
+
+  for(size_t i = 0; i < actionnode.children.size(); i++)
+  {
+    const ActionDescription &a = actionnode.children[i];
+    GetEventRange(a, beginEvent, endEvent);
+
+    if(a.events.empty() ||
+       (a.flags & (ActionFlags::PushMarker | ActionFlags::SetMarker | ActionFlags::PopMarker)))
+      continue;
+
+    if(beginEvent == 0)
+      beginEvent = a.eventId;
+    if(endEvent < a.eventId)
+      endEvent = a.eventId;
+  }
 }

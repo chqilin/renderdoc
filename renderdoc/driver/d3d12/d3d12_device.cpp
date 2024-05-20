@@ -4809,3 +4809,10 @@ void WrappedID3D12Device::ReplayLog(uint32_t startEventID, uint32_t endEventID,
     ExecuteLists();
   }
 }
+
+// L2-qilincheng: Begin
+void WrappedID3D12Device::SetEventPredicate(const std::function<bool(int32_t)> &predicate)
+{
+  m_Queue->SetEventPredicate(predicate);
+}
+// L2-qilincheng: End

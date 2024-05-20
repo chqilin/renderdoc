@@ -158,6 +158,10 @@ public:
   void ReplayLog(uint32_t endEventID, ReplayLogType replayType);
   SDFile *GetStructuredFile();
 
+  // L2-qilincheng: Begin
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate);
+  // L2-qilincheng: End
+
   rdcarray<uint32_t> GetPassEvents(uint32_t eventId);
 
   rdcarray<WindowingSystem> GetSupportedWindowSystems();
@@ -200,7 +204,8 @@ public:
 
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
-  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters);
+  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
+                                        const rdcarray<uint8_t> &eventMask);
 
   void RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &secondaryDraws,
                   const MeshDisplay &cfg);

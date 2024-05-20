@@ -491,7 +491,8 @@ public:
   IMPLEMENT_FUNCTION_PROXIED(rdcarray<GPUCounter>, EnumerateCounters);
   IMPLEMENT_FUNCTION_PROXIED(CounterDescription, DescribeCounter, GPUCounter counterID);
   IMPLEMENT_FUNCTION_PROXIED(rdcarray<CounterResult>, FetchCounters,
-                             const rdcarray<GPUCounter> &counterID);
+                             const rdcarray<GPUCounter> &counterID,
+                             const rdcarray<uint8_t> &eventMask);
 
   IMPLEMENT_FUNCTION_PROXIED(void, FillCBufferVariables, ResourceId pipeline, ResourceId shader,
                              ShaderStage stage, rdcstr entryPoint, uint32_t cbufSlot,

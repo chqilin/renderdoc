@@ -643,7 +643,7 @@ uint32_t WrappedVulkan::HandlePreCallback(VkCommandBuffer commandBuffer, ActionF
   }
 
   eventId += multiDrawOffset;
-
+  
   if(type == ActionFlags::Drawcall)
     m_ActionCallback->PreDraw(eventId, commandBuffer);
   else if(type == ActionFlags::Dispatch)
@@ -2938,6 +2938,8 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
 
   uint64_t startOffset = ser.GetReader()->GetOffset();
 
+  bool bSimulation = true;
+
   for(;;)
   {
     if(IsActiveReplaying(m_State) && m_RootEventID > endEventID)
@@ -2958,7 +2960,33 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
 
     m_LastCmdBufferID = ResourceId();
 
-    bool success = ContextProcessChunk(ser, chunktype);
+    // L2-qilincheng: Begin
+    if(!bSimulation)
+    {
+      if(chunktype != VulkanChunk::vkCmdDraw && 
+          chunktype != VulkanChunk::vkCmdDrawIndexed &&
+         chunktype != VulkanChunk::vkCmdDrawIndexedIndirect &&
+          chunktype != VulkanChunk::vkCmdDrawIndexedIndirectCount && 
+          chunktype != VulkanChunk::vkCmdDrawIndirect && 
+          chunktype != VulkanChunk::vkCmdDrawIndirectByteCountEXT && 
+          chunktype != VulkanChunk::vkCmdDrawIndirectCount && 
+          chunktype != VulkanChunk::vkCmdWriteBufferMarkerAMD && 
+          chunktype != VulkanChunk::vkCmdDispatch && 
+          chunktype != VulkanChunk::vkCmdDispatchBase &&
+         chunktype != VulkanChunk::vkCmdDispatchIndirect)
+      {
+        bSimulation = true;
+      }
+    }
+
+    bool success = true;
+    m_EventCount++;
+    if(bSimulation)
+    {
+      m_SimulationCount++;
+      success = ContextProcessChunk(ser, chunktype);
+    }
+    // L2-qilincheng: End
 
     ser.EndChunk();
 
@@ -3028,6 +3056,17 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
          chunktype != VulkanChunk::vkEndCommandBuffer)
         m_BakedCmdBufferInfo[m_LastCmdBufferID].curEventID++;
     }
+
+    // L2-qilincheng: Begin
+    auto curEventID = m_LastCmdBufferID != ResourceId()
+                           ? m_BakedCmdBufferInfo[m_LastCmdBufferID].curEventID
+                           : m_RootEventID;
+    bSimulation = true;
+    if(curEventID < m_EventMask.size() && !m_EventMask[curEventID])
+    {
+      bSimulation = false;
+    }
+    // L2-qilincheng: End
   }
 
   if(!partial && !IsStructuredExporting(m_State))

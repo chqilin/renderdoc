@@ -264,6 +264,7 @@ public:
     DriverInformation ret = {};
     return ret;
   }
+
   rdcarray<GPUDevice> GetAvailableGPUs() { return {}; }
   void ReplayLog(uint32_t endEventID, ReplayLogType replayType) {}
   rdcarray<uint32_t> GetPassEvents(uint32_t eventId) { return rdcarray<uint32_t>(); }
@@ -277,7 +278,11 @@ public:
     desc.counter = counterID;
     return desc;
   }
-  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters) { return {}; }
+  rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
+                                        const rdcarray<uint8_t> &eventMask)
+  {
+    return {};
+  }
   void FillCBufferVariables(ResourceId pipeline, ResourceId shader, ShaderStage stage,
                             rdcstr entryPoint, uint32_t cbufSlot, rdcarray<ShaderVariable> &outvars,
                             const bytebuf &data)

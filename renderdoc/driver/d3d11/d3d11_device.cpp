@@ -1591,6 +1591,13 @@ void WrappedID3D11Device::ReplayLog(uint32_t startEventID, uint32_t endEventID,
                      ToStr(m_pDevice->GetDeviceRemovedReason()).c_str());
 }
 
+// L2-qilincheng: Begin
+void WrappedID3D11Device::SetEventPredicate(const std::function<bool(int32_t)> &predicate)
+{
+  m_pImmediateContext->SetEventPredicate(predicate);
+}
+// L2-qilincheng: End
+
 void WrappedID3D11Device::NewSwapchainBuffer(IUnknown *backbuffer)
 {
   WrappedID3D11Texture2D1 *wrapped = (WrappedID3D11Texture2D1 *)backbuffer;

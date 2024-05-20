@@ -275,6 +275,7 @@ struct VulkanNvidiaActionCallback final : public VulkanActionCallback
                       VkCommandBuffer cmd) final
   {
   }
+
   WrappedVulkan *m_driver;
 };
 

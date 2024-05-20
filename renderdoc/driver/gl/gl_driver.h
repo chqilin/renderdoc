@@ -339,6 +339,15 @@ private:
 
   uint32_t m_InitChunkIndex = 0;
 
+  // L2-qilincheng: Begin
+  std::function<bool(int32_t)> m_EventPredicate;
+
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate)
+  {
+    m_EventPredicate = predicate;
+  }
+  // L2-qilincheng: End
+
   bool ProcessChunk(ReadSerialiser &ser, GLChunk chunk);
   RDResult ContextReplayLog(CaptureState readType, uint32_t startEventID, uint32_t endEventID,
                             bool partial);

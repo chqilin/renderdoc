@@ -339,6 +339,15 @@ public:
     return m_pReal->SetName(Name);
   }
 
+  // L2-qilincheng: Begin
+  std::function<bool(int32_t)> m_EventPredicate;
+
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate)
+  {
+    m_EventPredicate = predicate;
+  }
+  // L2-qilincheng: End
+
   //////////////////////////////
   // implement ID3D12DeviceChild
 

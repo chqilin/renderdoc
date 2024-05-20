@@ -232,7 +232,8 @@ CounterDescription DummyDriver::DescribeCounter(GPUCounter counterID)
   return {};
 }
 
-rdcarray<CounterResult> DummyDriver::FetchCounters(const rdcarray<GPUCounter> &counterID)
+rdcarray<CounterResult> DummyDriver::FetchCounters(const rdcarray<GPUCounter> &counterID,
+                                                   const rdcarray<uint8_t> &eventMask)
 {
   return {};
 }

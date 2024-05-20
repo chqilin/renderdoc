@@ -329,6 +329,7 @@ void PerformanceCounterViewer::CaptureCounters()
   ANALYTIC_SET(UIFeatures.PerformanceCounters, true);
 
   bool done = false;
+
   m_Ctx.Replay().AsyncInvoke([this, &done](IReplayController *controller) -> void {
     rdcarray<GPUCounter> counters;
     counters.resize(m_SelectedCounters.size());
@@ -341,12 +342,132 @@ void PerformanceCounterViewer::CaptureCounters()
       counterDescriptions.push_back(controller->DescribeCounter(counters[i]));
     }
 
-    rdcarray<CounterResult> results = controller->FetchCounters(counters);
+    rdcarray<CounterResult> results = controller->FetchCounters(counters, {});
 
-    GUIInvoke::call(this, [this, results, counterDescriptions]() {
+    // L2-qilincheng: Begin
+    // Prepare event-mask array
+    auto *action = m_Ctx.GetLastAction();
+    uint32_t maxEID = action->eventId;
+
+    rdcarray<uint8_t> eventMask;
+    eventMask.resize(maxEID + 1);
+    for(uint32_t eid = 0; eid <= maxEID; eid++)
+    {
+      bool bVisibleInEventBrowser = m_Ctx.GetEventBrowser()->IsAPIEventVisible(eid);
+      eventMask[eid] = bVisibleInEventBrowser ? 0x00 : 0x01;
+    }
+
+    // FetchCounter with event-mask
+    rdcarray<CounterResult> maskedResults = controller->FetchCounters(counters, eventMask);
+
+    // Because of we added a duration-counter in the results-array, We need get it value and remove it here.
+    auto SelectAndRemoveDurationCounter = [](rdcarray<CounterResult> &results) -> double {
+      double ms = 0;
+      for(size_t index = 0; index < results.size(); index++)
+      {
+        auto &r = results[index];
+        if(r.eventId == 0 && r.counter == GPUCounter::EventGPUDuration)
+        {
+          ms = r.value.d * 1000;    // to us.
+          results.erase(index);
+          break;
+        }
+      }
+      return ms;
+    };
+
+    // pass duration
+    double totalDuration = SelectAndRemoveDurationCounter(results);
+    double notmaskedDuration = SelectAndRemoveDurationCounter(maskedResults);
+
+    struct CounterStats
+    {
+      uint32_t events = 0;
+      double duration = 0;
+      uint32_t drawcalls = 0;
+      uint32_t verts = 0;
+      uint32_t tris = 0;
+
+      CounterStats operator-(const CounterStats &other)
+      {
+        CounterStats result;
+        result.events = this->events - other.events;
+        result.duration = this->duration - other.duration;
+        result.drawcalls = this->drawcalls - other.drawcalls;
+        result.verts = this->verts - other.verts;
+        result.tris = this->tris - other.tris;
+        return result;
+      }
+    };
+
+    CounterStats totalStats;
+    {
+      totalStats.events = (uint32_t)eventMask.size();
+      totalStats.duration = totalDuration;
+      totalStats.drawcalls = uint32_t(results.size() / counters.size());
+
+      for(size_t index = 0; index < results.size(); index++)
+      {
+        auto &r = results[index];
+        if(r.counter == GPUCounter::InputVerticesRead)
+          totalStats.verts += r.value.u64;
+        else if(r.counter == GPUCounter::IAPrimitives)
+          totalStats.tris += r.value.u64;
+      }
+    }
+
+    CounterStats maskedStats;
+    {
+      for(auto &mask : eventMask)
+      {
+        if(!mask)
+        {
+          maskedStats.events += 1;
+        }
+      }
+
+      maskedStats.duration = totalDuration - notmaskedDuration;
+
+      std::map<uint32_t, bool> maskedDrawCalls;
+      for(size_t index = 0; index < results.size(); index++)
+      {
+        auto &r = results[index];
+        if(eventMask[r.eventId])
+          continue;
+
+        maskedDrawCalls[r.eventId] = true;
+        if(r.counter == GPUCounter::InputVerticesRead)
+          maskedStats.verts += r.value.u64;
+        else if(r.counter == GPUCounter::IAPrimitives)
+          maskedStats.tris += r.value.u64;
+      }
+      maskedStats.drawcalls = (uint32_t)maskedDrawCalls.size();
+    }
+    // L2-qilincheng: End
+
+    GUIInvoke::call(this, [this, results, counterDescriptions, totalStats, maskedStats]() {
       m_ItemModel->refresh(counterDescriptions, results);
 
       ui->counterResults->resizeColumnsToContents();
+
+      // L2-qilincheng: Begin
+      char buf[1024] = {0};
+      sprintf(buf,
+              "<table width='100%%' border='1' cellspacing='0' cellpadding='4'>"
+                  "<tr><td> </td>               <td> Total </td>        <td> Masked </td></tr>"
+                  "<tr><td> Events </td>        <td> %lu </td>          <td> %lu </td></tr>"
+                  "<tr><td> Time </td>          <td> %.3f ms </td>      <td> %.3f ms </td></tr>"
+                  "<tr><td> DrawCall </td>      <td> %lu </td>          <td> %lu </td></tr>"
+                  "<tr><td> Vertices </td>      <td> %lu </td>          <td> %lu </td></tr>"
+                  "<tr><td> Triangles </td>     <td> %lu </td>          <td> %lu </td></tr>"
+              "</table>",
+              totalStats.events, maskedStats.events, 
+              totalStats.duration, maskedStats.duration,
+              totalStats.drawcalls, maskedStats.drawcalls, 
+              totalStats.verts, maskedStats.verts,
+              totalStats.tris, maskedStats.tris);
+      ui->statusText->setText(QString::fromUtf8(buf));
+      // L2-qilincheng: End
     });
 
     done = true;

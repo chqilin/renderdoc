@@ -287,7 +287,7 @@ extern "C" RENDERDOC_API void RENDERDOC_CC RENDERDOC_LogMessage(LogType type, co
 #endif
 
   if(type == LogType::Fatal)
-    RDCDUMP();
+    RDCDUMP();  
 }
 
 extern "C" RENDERDOC_API const char *RENDERDOC_CC RENDERDOC_GetLogFile()

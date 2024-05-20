@@ -994,6 +994,10 @@ public:
   RDResult ReadLogInitialisation(RDCFile *rdc, bool storeStructuredBuffers);
   void ReplayLog(uint32_t startEventID, uint32_t endEventID, ReplayLogType replayType);
 
+  // L2-qilincheng: Begin
+  void SetEventPredicate(const std::function<bool(int32_t)> &predicate);
+  // L2-qilincheng: End
+
   void SetStructuredExport(uint64_t sectionVersion)
   {
     m_SectionVersion = sectionVersion;

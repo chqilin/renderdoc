@@ -755,7 +755,8 @@ ResourceId ReplayProxy::GetLiveID(ResourceId id)
 template <typename ParamSerialiser, typename ReturnSerialiser>
 rdcarray<CounterResult> ReplayProxy::Proxied_FetchCounters(ParamSerialiser &paramser,
                                                            ReturnSerialiser &retser,
-                                                           const rdcarray<GPUCounter> &counters)
+                                                           const rdcarray<GPUCounter> &counters,
+                                                           const rdcarray<uint8_t> &eventMask)
 {
   const ReplayProxyPacket expectedPacket = eReplayProxy_FetchCounters;
   ReplayProxyPacket packet = eReplayProxy_FetchCounters;
@@ -764,13 +765,14 @@ rdcarray<CounterResult> ReplayProxy::Proxied_FetchCounters(ParamSerialiser &para
   {
     BEGIN_PARAMS();
     SERIALISE_ELEMENT(counters);
+    SERIALISE_ELEMENT(eventMask);
     END_PARAMS();
   }
 
   {
     REMOTE_EXECUTION();
     if(paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored)
-      ret = m_Remote->FetchCounters(counters);
+      ret = m_Remote->FetchCounters(counters, eventMask);    
   }
 
   SERIALISE_RETURN(ret);
@@ -778,9 +780,10 @@ rdcarray<CounterResult> ReplayProxy::Proxied_FetchCounters(ParamSerialiser &para
   return ret;
 }
 
-rdcarray<CounterResult> ReplayProxy::FetchCounters(const rdcarray<GPUCounter> &counters)
+rdcarray<CounterResult> ReplayProxy::FetchCounters(const rdcarray<GPUCounter> &counters,
+                                                   const rdcarray<uint8_t> &eventMask)
 {
-  PROXY_FUNCTION(FetchCounters, counters);
+  PROXY_FUNCTION(FetchCounters, counters, eventMask);
 }
 
 template <typename ParamSerialiser, typename ReturnSerialiser>
@@ -2911,7 +2914,8 @@ bool ReplayProxy::Tick(int type)
     case eReplayProxy_FetchCounters:
     {
       rdcarray<GPUCounter> counters;
-      FetchCounters(counters);
+      rdcarray<uint8_t> eventMask;
+      FetchCounters(counters, eventMask);
       break;
     }
     case eReplayProxy_EnumerateCounters: EnumerateCounters(); break;

@@ -174,6 +174,31 @@
      </attribute>
     </widget>
    </item>
+	<!-- L2-qilincheng: Begin -->
+	<item>
+		<layout class="QHBoxLayout" name="statusLayout">
+			<property name="leftMargin">
+				<number>5</number>
+			</property>
+			<property name="topMargin">
+				<number>5</number>
+			</property>
+			<property name="rightMargin">
+				<number>5</number>
+			</property>
+			<property name="bottomMargin">
+				<number>5</number>
+			</property>
+			<item>
+				<widget class="QLabel" name="statusText">
+					<property name="text">
+						<string>Status</string>
+					</property>
+				</widget>
+			</item>
+		</layout>
+	</item>
+	<!-- L2-qilincheng: End -->
   </layout>
  </widget>
  <customwidgets>
