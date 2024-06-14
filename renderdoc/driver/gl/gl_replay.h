@@ -205,7 +205,12 @@ public:
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
   rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
-                                        const rdcarray<uint8_t> &eventMask);
+                                    #if defined(POP_DEBUG)
+                                        const rdcarray<EventStatusFiltered> &eventMask,
+                                    #else
+                                        const rdcarray<uint8_t> &eventMask,
+                                    #endif
+                                        uint32_t Phase);
 
   void RenderMesh(uint32_t eventId, const rdcarray<MeshFormat> &secondaryDraws,
                   const MeshDisplay &cfg);

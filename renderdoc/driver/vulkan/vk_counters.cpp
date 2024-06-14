@@ -125,6 +125,14 @@ rdcarray<GPUCounter> VulkanReplay::EnumerateCounters()
   VkPhysicalDeviceFeatures availableFeatures = m_pDriver->GetDeviceEnabledFeatures();
 
   ret.push_back(GPUCounter::EventGPUDuration);
+  // Begin L2 sungxu : Render pass GPU duration time.
+  ret.push_back(GPUCounter::RenderPassGPUDuration);
+#if DISABLED(RDOC_ANDROID) && DISABLED(RDOC_APPLE)
+  ret.push_back(GPUCounter::BeginRenderPassGPUDuration);
+#endif
+  ret.push_back(GPUCounter::EventGPUDurationDrawCalls);
+  ret.push_back(GPUCounter::EventGPUDurationDispatches);
+  // End L2 sungxu
   if(availableFeatures.pipelineStatisticsQuery)
   {
     ret.push_back(GPUCounter::InputVerticesRead);
@@ -255,6 +263,47 @@ CounterDescription VulkanReplay::DescribeCounter(GPUCounter counterID)
       desc.resultType = CompType::Float;
       desc.unit = CounterUnit::Seconds;
       break;
+    // Begin L2 sungxu : Render pss GPU duration time.
+   case GPUCounter::RenderPassGPUDuration:
+      desc.name = "Render Pass GPU Duration";
+      desc.description = 
+          "Time taken for single render pass on the GPU, as measured by delta between two GPU timestamps.";
+      desc.resultByteWidth = 8;
+      desc.resultType = CompType::Float;
+      desc.unit = CounterUnit::Seconds;
+      break;
+#if DISABLED(RDOC_ANDROID) && DISABLED(RDOC_APPLE)
+   case GPUCounter::BeginRenderPassGPUDuration:
+     desc.name = "Begin Render Pass GPU Duration";
+     desc.description =
+         "Time taken for command vkCmdBeginRenderPass on the GPU, as measured by delta between two GPU. "
+         "timestamps.";
+     desc.resultByteWidth = 8;
+     desc.resultType = CompType::Float;
+     desc.unit = CounterUnit::Seconds;
+     break;
+#endif
+   case GPUCounter::EventGPUDurationDrawCalls:
+     desc.name = "Draw Calls GPU Duration";
+     desc.description =
+         "Time taken for draw calls on the GPU, as measured by delta between two "
+         "GPU. "
+         "timestamps.";
+     desc.resultByteWidth = 8;
+     desc.resultType = CompType::Float;
+     desc.unit = CounterUnit::Seconds;
+     break;
+   case GPUCounter::EventGPUDurationDispatches:
+     desc.name = "Dispatch Calls GPU Duration";
+     desc.description =
+         "Time taken for dispatch calls on the GPU, as measured by delta between two "
+         "GPU. "
+         "timestamps.";
+     desc.resultByteWidth = 8;
+     desc.resultType = CompType::Float;
+     desc.unit = CounterUnit::Seconds;
+     break;
+    // End L2 sungxu
     case GPUCounter::InputVerticesRead:
       desc.name = "Input Vertices Read";
       desc.description = "Number of vertices read by input assembler.";
@@ -361,7 +410,7 @@ struct VulkanAMDActionCallback : public VulkanActionCallback
   }
 
   virtual ~VulkanAMDActionCallback() { m_pDriver->SetActionCB(NULL); }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd) override
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     m_pEventIds->push_back(eid);
 
@@ -379,7 +428,7 @@ struct VulkanAMDActionCallback : public VulkanActionCallback
     ++*m_pSampleId;
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) override
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     VkCommandBuffer realCmdBuffer = Unwrap(cmd);
 
@@ -402,8 +451,8 @@ struct VulkanAMDActionCallback : public VulkanActionCallback
 
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) override {}
   // we don't need to distinguish, call the Draw functions
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) override { PreDraw(eid, cmd); }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) override { return PostDraw(eid, cmd); }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { PreDraw(eid, cmd, type); }
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { return PostDraw(eid, cmd, type); }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) override { PostRedraw(eid, cmd); }
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override
   {
@@ -555,12 +604,12 @@ struct VulkanKHRCallback : public VulkanActionCallback
     m_pDriver->SetActionCB(this);
   }
   ~VulkanKHRCallback() { m_pDriver->SetActionCB(NULL); }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd) override
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     ObjDisp(cmd)->CmdBeginQuery(Unwrap(cmd), m_QueryPool, (uint32_t)m_Results.size(), 0);
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) override
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     ObjDisp(cmd)->CmdEndQuery(Unwrap(cmd), m_QueryPool, (uint32_t)m_Results.size());
     m_Results.push_back(eid);
@@ -569,8 +618,8 @@ struct VulkanKHRCallback : public VulkanActionCallback
 
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) override {}
   // we don't need to distinguish, call the Draw functions
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) override { PreDraw(eid, cmd); }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) override { return PostDraw(eid, cmd); }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { PreDraw(eid, cmd); }
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { return PostDraw(eid, cmd, type); }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) override { PostRedraw(eid, cmd); }
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override { PreDraw(eid, cmd); }
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override
@@ -611,6 +660,8 @@ struct VulkanKHRCallback : public VulkanActionCallback
 
 rdcarray<CounterResult> VulkanReplay::FetchCountersKHR(const rdcarray<GPUCounter> &counters)
 {
+  RDCLOG("SXU -> FetchCounterKHR(...)!");
+
   rdcarray<uint32_t> counterIndices;
   for(const GPUCounter &c : counters)
     counterIndices.push_back(FromKHRCounter(c));
@@ -740,11 +791,28 @@ rdcarray<CounterResult> VulkanReplay::FetchCountersKHR(const rdcarray<GPUCounter
 
 struct VulkanGPUTimerCallback : public VulkanActionCallback
 {
-  VulkanGPUTimerCallback(WrappedVulkan *vk, VulkanReplay *rp, VkQueryPool tsqp, VkQueryPool occqp,
+  VulkanGPUTimerCallback(WrappedVulkan *vk, VulkanReplay *rp, VkQueryPool tsqp, 
+                         VkQueryPool tsqprp, 
+                         // Begin L2 sungxu : Render pass GPU duration
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+                         VkQueryPool tsqpbrp,
+#endif
+                         VkQueryPool drawqp,
+                         VkQueryPool dispatchqp,
+                         // End L2 sungxu
+                         VkQueryPool occqp,
                          VkQueryPool psqp, VkQueryPool cpsqp)
       : m_pDriver(vk),
         m_pReplay(rp),
         m_TimeStampQueryPool(tsqp),
+        // Begin L2 sungxu : Render pass GPU duration
+        m_TimeStampQueryPoolForRenderPasses(tsqprp),
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+        m_TimeStampQueryPoolForBeginRenderPasses(tsqpbrp),
+#endif
+        m_TimeStampQueryPoolForDrawCalls(drawqp),
+        m_TimeStampQueryPoolForDispatchCalls(dispatchqp),
+        // End L2 sungxu
         m_OcclusionQueryPool(occqp),
         m_PipeStatsQueryPool(psqp),
         m_ComputePipeStatsQueryPool(cpsqp)
@@ -752,7 +820,7 @@ struct VulkanGPUTimerCallback : public VulkanActionCallback
     m_pDriver->SetActionCB(this);
   }
   ~VulkanGPUTimerCallback() { m_pDriver->SetActionCB(NULL); }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd) override
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     VkQueueFlags cmdType = m_pDriver->GetCommandType();
     if(cmdType & VK_QUEUE_GRAPHICS_BIT)
@@ -770,12 +838,51 @@ struct VulkanGPUTimerCallback : public VulkanActionCallback
     }
     ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                     m_TimeStampQueryPool, (uint32_t)(m_Results.size() * 2 + 0));
+    // Begin L2 sungxu : Render pass GPU duration
+    if(type == (uint32_t)VulkanChunk::vkCmdDraw || 
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndirect ||
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexed ||
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect)
+    {
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForDrawCalls,
+                                      (uint32_t)(m_DrawCallCount * 2 + 0));
+    }
+    else if(type == (uint32_t)VulkanChunk::vkCmdDispatch ||
+            type == (uint32_t)VulkanChunk::vkCmdDispatchIndirect)
+    {
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForDispatchCalls,
+                                      (uint32_t)(m_DispatchCallsDurationResults.size() * 2 + 0));
+    }
+    // End L2 sungxu
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) override
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
+    // Begin L2 sungxu : Render pass GPU duration
+    if(type == (uint32_t)VulkanChunk::vkCmdDraw ||
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndirect ||
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexed || 
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect)
+    {
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForDrawCalls,
+                                      (uint32_t)(m_DrawCallCount * 2 + 1));
+      m_DrawCallCount++;
+    }
+    else if(type == (uint32_t)VulkanChunk::vkCmdDispatch ||
+            type == (uint32_t)VulkanChunk::vkCmdDispatchIndirect)
+    {
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                    m_TimeStampQueryPoolForDispatchCalls,
+                                      (uint32_t)(m_DispatchCallsDurationResults.size() * 2 + 1));
+      m_DispatchCallCount++;
+    }
+
     ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                     m_TimeStampQueryPool, (uint32_t)(m_Results.size() * 2 + 1));
+    // End L2 sungxu
 
     VkQueueFlags cmdType = m_pDriver->GetCommandType();
     if(cmdType & VK_QUEUE_GRAPHICS_BIT)
@@ -793,25 +900,85 @@ struct VulkanGPUTimerCallback : public VulkanActionCallback
       m_ComputeQueries++;
     }
     m_Results.push_back({eid, cmdType});
+    m_EventTypeResults.push_back({eid, m_pDriver->m_EventType});
+    if (type == (uint32_t)VulkanChunk::vkCmdDraw || 
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndirect ||
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexed || 
+       type == (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect
+       )
+    {
+      m_DrawCallsDurationResults.push_back({eid, cmdType});
+    }
+    else if(type == (uint32_t)VulkanChunk::vkCmdDispatch ||
+            type == (uint32_t)VulkanChunk::vkCmdDispatchIndirect
+            )
+    {
+      m_DispatchCallsDurationResults.push_back({eid, cmdType});
+    }
     return false;
   }
 
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) override {}
   // we don't need to distinguish, call the Draw functions
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) override { PreDraw(eid, cmd); }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) override { return PostDraw(eid, cmd); }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { PreDraw(eid, cmd, type); }
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { return PostDraw(eid, cmd, type); }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) override { PostRedraw(eid, cmd); }
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override
   {
-    if(flags & ActionFlags::PassBoundary)
-      return;
-    PreDraw(eid, cmd);
+    if (flags & ActionFlags::BeginPassMobile)
+    {
+      RDCLOG("BeginRenderPass %u", m_RenderPassCount);
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                   m_TimeStampQueryPoolForRenderPasses,
+                                   (uint32_t)(m_RenderPassCount * 2 + 0));
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+      RDCLOG("Insert time stamp before vkCmdBeginRenderPass", m_RenderPassCount);
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForBeginRenderPasses,
+                                      (uint32_t)(m_BeginRenderPassCount * 2 + 0));
+#endif
+    }
+    else
+    {
+      if(flags & ActionFlags::PassBoundary)
+        return;
+      PreDraw(eid, cmd);
+    }
   }
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override
   {
-    if(flags & ActionFlags::PassBoundary)
+    if(flags & ActionFlags::EndPassMobile)
+    {
+      RDCLOG("EndRenderPass %u.", m_RenderPassCount);
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForRenderPasses,
+                                      (uint32_t)(m_RenderPassCount * 2 + 1));
+      m_RenderPassCount++;
+      VkQueueFlags cmdType = m_pDriver->GetCommandType();
+      m_RenderPassDurationResults.push_back({eid, cmdType});
+      m_EventTypeResults.push_back({eid, m_pDriver->m_EventType});
       return false;
-    return PostDraw(eid, cmd);
+    }
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+    else if(flags & ActionFlags::BeginPassMobile)
+    {
+      RDCLOG("Insert time stamp after vkCmdBeginRenderPass", m_RenderPassCount);
+      ObjDisp(cmd)->CmdWriteTimestamp(Unwrap(cmd), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                      m_TimeStampQueryPoolForBeginRenderPasses,
+                                      (uint32_t)(m_BeginRenderPassCount * 2 + 1));
+      m_BeginRenderPassCount++;
+      VkQueueFlags cmdType = m_pDriver->GetCommandType();
+      m_BeginRenderPassDurationResults.push_back({eid, cmdType});
+      m_EventTypeResults.push_back({eid, m_pDriver->m_EventType});
+      return false;
+    }
+#endif
+    else
+    {
+      if(flags & ActionFlags::PassBoundary)
+        return false;
+      return PostDraw(eid, cmd);
+    }
   }
   void PostRemisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) override
   {
@@ -839,12 +1006,43 @@ struct VulkanGPUTimerCallback : public VulkanActionCallback
   WrappedVulkan *m_pDriver;
   VulkanReplay *m_pReplay;
   VkQueryPool m_TimeStampQueryPool;
+
+  // Begin L2 sungxu : Render pass GPU duration.
+  VkQueryPool m_TimeStampQueryPoolForRenderPasses;
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+  VkQueryPool m_TimeStampQueryPoolForBeginRenderPasses;
+#endif
+  VkQueryPool m_TimeStampQueryPoolForDrawCalls;
+  VkQueryPool m_TimeStampQueryPoolForDispatchCalls;
+  // End L2 sungxu
+
   VkQueryPool m_OcclusionQueryPool;
   VkQueryPool m_PipeStatsQueryPool;
   VkQueryPool m_ComputePipeStatsQueryPool;
   rdcarray<rdcpair<uint32_t, VkQueueFlags>> m_Results;
+
+  // Begin L2 sungxu : Render pass GPU duration.
+  rdcarray<rdcpair<uint32_t, uint32_t>> m_EventTypeResults;
+  rdcarray<rdcpair<uint32_t, VkQueueFlags>> m_RenderPassDurationResults;
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+  rdcarray<rdcpair<uint32_t, VkQueueFlags>> m_BeginRenderPassDurationResults;
+#endif
+  rdcarray<rdcpair<uint32_t, VkQueueFlags>> m_DrawCallsDurationResults;
+  rdcarray<rdcpair<uint32_t, VkQueueFlags>> m_DispatchCallsDurationResults;
+  // End L2 sungxu
+
   uint32_t m_GraphicsQueries = 0;
   uint32_t m_ComputeQueries = 0;
+
+  // Begin L2 sungxu : Render pass GPU duration.
+  uint32_t m_RenderPassCount = 0;
+#if DISABLED(RDOC_ANDROID) && DISABLED(RDOC_APPLE)
+  uint32_t m_BeginRenderPassCount = 0;
+#endif
+  uint32_t m_DrawCallCount = 0;
+  uint32_t m_DispatchCallCount = 0;
+  // End L2 sungxu
+
   // events which are the 'same' from being the same command buffer resubmitted
   // multiple times in the frame. We will only get the full callback when we're
   // recording the command buffer, and will be given the first EID. After that
@@ -853,7 +1051,12 @@ struct VulkanGPUTimerCallback : public VulkanActionCallback
 };
 
 rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &counters,
-                                                    const rdcarray<uint8_t> &eventMask)
+                                                #if defined(POP_DEBUG)
+                                                    const rdcarray<EventStatusFiltered> &eventMask,
+                                                #else
+                                                    const rdcarray<uint8_t> &eventMask,
+                                                #endif
+                                                    uint32_t Phase)
 {
   uint32_t maxEID = m_pDriver->GetMaxEID();
 
@@ -862,6 +1065,7 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
                [](const GPUCounter &c) { return IsGenericCounter(c); });
 
   rdcarray<CounterResult> ret;
+  rdcarray<CounterResult> renderpassret;
 
   if(m_pAMDCounters)
   {
@@ -931,6 +1135,29 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
       ObjDisp(dev)->CreateQueryPool(Unwrap(dev), &timeStampPoolCreateInfo, NULL, &timeStampPool);
   CheckVkResult(vkr);
 
+  // Begin L2 sungxu : RenderPass GPU time duration on mobile
+  VkQueryPool timeStampPoolForRenderPasses;
+  vkr = ObjDisp(dev)->CreateQueryPool(Unwrap(dev), &timeStampPoolCreateInfo, NULL, &timeStampPoolForRenderPasses);
+  CheckVkResult(vkr);
+
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+  VkQueryPool timeStampPoolForBeginRenderPasses;
+  vkr = ObjDisp(dev)->CreateQueryPool(Unwrap(dev), &timeStampPoolCreateInfo, NULL,
+                                      &timeStampPoolForBeginRenderPasses);
+  CheckVkResult(vkr);
+#endif
+
+  VkQueryPool timeStampPoolForDrawCalls;
+  vkr = ObjDisp(dev)->CreateQueryPool(Unwrap(dev), &timeStampPoolCreateInfo, NULL,
+                                      &timeStampPoolForDrawCalls);
+  CheckVkResult(vkr);
+
+  VkQueryPool timeStampPoolForDispatchCalls;
+  vkr = ObjDisp(dev)->CreateQueryPool(Unwrap(dev), &timeStampPoolCreateInfo, NULL,
+                                      &timeStampPoolForDispatchCalls);
+  CheckVkResult(vkr);
+  // End L2 sungxu
+
   bool occlNeeded = false;
   bool statsNeeded = false;
 
@@ -990,6 +1217,19 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
   CheckVkResult(vkr);
 
   ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), timeStampPool, 0, maxEID * 2);
+
+  // Begin L2 sungxu : RenderPass GPU time duration on mobile
+  ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), timeStampPoolForRenderPasses, 0, maxEID * 2);
+
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+  ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), timeStampPoolForBeginRenderPasses, 0, maxEID * 2);
+#endif
+
+  ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), timeStampPoolForDrawCalls, 0, maxEID * 2);
+
+  ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), timeStampPoolForDispatchCalls, 0, maxEID * 2);
+  // End L2 sungxu
+
   if(occlusionPool != VK_NULL_HANDLE)
     ObjDisp(dev)->CmdResetQueryPool(Unwrap(cmd), occlusionPool, 0, maxEID);
   if(pipeStatsPool != VK_NULL_HANDLE)
@@ -1004,11 +1244,24 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
     m_pDriver->SubmitCmds();
 
   {
-    VulkanGPUTimerCallback cb(m_pDriver, this, timeStampPool, occlusionPool, pipeStatsPool,
+    VulkanGPUTimerCallback cb(m_pDriver, this, timeStampPool, 
+    // Begin L2 sungxu : Render pass GPU duration
+                              timeStampPoolForRenderPasses, 
+    #if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+                              timeStampPoolForBeginRenderPasses,
+    #endif
+                              timeStampPoolForDrawCalls,
+                              timeStampPoolForDispatchCalls,
+    // End L2 sungxu
+                              occlusionPool, pipeStatsPool,
                               compPipeStatsPool);
 
     // replay the events to perform all the queries
+    m_pDriver->m_FetchPhase = Phase;
+    RDCLOG("SXU -> m_FetchPhase = Phase %u", Phase);
+    m_pDriver->SetEventMask(eventMask);
     m_pDriver->ReplayLog(0, maxEID, eReplay_Full);
+    m_pDriver->SetEventMask({});
 
     rdcarray<uint64_t> timeStampData;
     timeStampData.resize(cb.m_Results.size() * 2);
@@ -1020,6 +1273,62 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
     CheckVkResult(vkr);
 
     ObjDisp(dev)->DestroyQueryPool(Unwrap(dev), timeStampPool, NULL);
+
+    // Begin L2 sungxu : RenderPass GPU time duration on mobile
+    rdcarray<uint64_t> timeStampDataForRenderPasses;
+    timeStampDataForRenderPasses.resize(cb.m_RenderPassDurationResults.size() * 2);
+
+    vkr = ObjDisp(dev)->GetQueryPoolResults(
+        Unwrap(dev), timeStampPoolForRenderPasses, 0, (uint32_t)timeStampDataForRenderPasses.size(),
+        sizeof(uint64_t) * timeStampDataForRenderPasses.size(), &timeStampDataForRenderPasses[0],
+        sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    CheckVkResult(vkr);
+
+    ObjDisp(dev)->DestroyQueryPool(Unwrap(dev), timeStampPoolForRenderPasses, NULL);
+
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+    rdcarray<uint64_t> timeStampDataForBeginRenderPasses;
+    timeStampDataForBeginRenderPasses.resize(cb.m_BeginRenderPassDurationResults.size() * 2);
+
+    vkr = ObjDisp(dev)->GetQueryPoolResults(
+        Unwrap(dev), timeStampPoolForBeginRenderPasses, 0, (uint32_t)timeStampDataForBeginRenderPasses.size(),
+        sizeof(uint64_t) * timeStampDataForBeginRenderPasses.size(), &timeStampDataForBeginRenderPasses[0],
+        sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    CheckVkResult(vkr);
+
+    ObjDisp(dev)->DestroyQueryPool(Unwrap(dev), timeStampPoolForBeginRenderPasses, NULL);
+#endif
+
+    // All draw calls
+    rdcarray<uint64_t> timeStampDataForDrawCalls;
+    timeStampDataForDrawCalls.resize(cb.m_DrawCallsDurationResults.size() * 2);
+
+    vkr = ObjDisp(dev)->GetQueryPoolResults(
+        Unwrap(dev), timeStampPoolForDrawCalls, 0,
+        (uint32_t)timeStampDataForDrawCalls.size(),
+        sizeof(uint64_t) * timeStampDataForDrawCalls.size(),
+        &timeStampDataForDrawCalls[0], sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    CheckVkResult(vkr);
+
+    ObjDisp(dev)->DestroyQueryPool(Unwrap(dev), timeStampPoolForDrawCalls, NULL);
+
+    // All Dispatch calls
+    rdcarray<uint64_t> timeStampDataForDispatchCalls;
+    timeStampDataForDispatchCalls.resize(cb.m_DispatchCallsDurationResults.size() * 2);
+
+    vkr = ObjDisp(dev)->GetQueryPoolResults(
+        Unwrap(dev), timeStampPoolForDispatchCalls, 0,
+        (uint32_t)timeStampDataForDispatchCalls.size(),
+        sizeof(uint64_t) * timeStampDataForDispatchCalls.size(),
+        &timeStampDataForDispatchCalls[0], sizeof(uint64_t),
+        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    CheckVkResult(vkr);
+
+    ObjDisp(dev)->DestroyQueryPool(Unwrap(dev), timeStampPoolForDispatchCalls, NULL);
+
+    // End L2 sungxu
 
     rdcarray<uint64_t> occlusionData;
     occlusionData.resize(cb.m_GraphicsQueries);
@@ -1097,6 +1406,7 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
 
         result.eventId = cb.m_Results[i].first;
         result.counter = vkCounters[c];
+        result.eventType = 0;
 
         switch(vkCounters[c])
         {
@@ -1150,6 +1460,110 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
       }
     }
 
+    // Begin L2 sungxu : Render pass GPU duratiuon.
+    for(size_t i = 0; i < cb.m_RenderPassDurationResults.size(); ++i)
+    {
+      for(size_t c = 0; c < vkCounters.size(); c++)
+      {
+        CounterResult result;
+
+        result.eventId = cb.m_RenderPassDurationResults[i].first;
+        result.counter = vkCounters[c];
+        result.eventType = 0;
+
+        if(GPUCounter::RenderPassGPUDuration == vkCounters[c])
+        {
+          uint64_t delta =
+              timeStampDataForRenderPasses[i * 2 + 1] - timeStampDataForRenderPasses[i * 2 + 0];
+          result.value.d = (double(m_pDriver->GetDeviceProps().limits.timestampPeriod) *
+                            double(delta))                  // nanoseconds
+                           / (1000.0 * 1000.0 * 1000.0);    // to seconds
+
+          ret.push_back(result);
+        }
+      }
+    }
+
+#if !defined(RENDERDOC_PLATFORM_ANDROID) && !defined(RENDERDOC_PLATFORM_APPLE)
+
+    for(size_t i = 0; i < cb.m_BeginRenderPassDurationResults.size(); ++i)
+    {
+      for(size_t c = 0; c < vkCounters.size(); c++)
+      {
+        CounterResult result;
+
+        result.eventId = cb.m_BeginRenderPassDurationResults[i].first;
+        result.counter = vkCounters[c];
+
+        if(GPUCounter::BeginRenderPassGPUDuration == vkCounters[c])
+        {
+          uint64_t delta = timeStampDataForBeginRenderPasses[i * 2 + 1] - timeStampDataForBeginRenderPasses[i * 2 + 0];
+          result.value.d = (double(m_pDriver->GetDeviceProps().limits.timestampPeriod) *
+                            double(delta))                  // nanoseconds
+                           / (1000.0 * 1000.0 * 1000.0);    // to seconds
+
+          ret.push_back(result);
+        }
+      }
+    }
+#endif
+    // All draw calls
+    for(size_t i = 0; i < cb.m_DrawCallsDurationResults.size(); ++i)
+    {
+      for(size_t c = 0; c < vkCounters.size(); c++)
+      {
+        CounterResult result;
+
+        result.eventId = cb.m_DrawCallsDurationResults[i].first;
+        result.counter = vkCounters[c];
+
+        if(GPUCounter::EventGPUDurationDrawCalls == vkCounters[c])
+        {
+          uint64_t delta = timeStampDataForDrawCalls[i * 2 + 1] -
+                           timeStampDataForDrawCalls[i * 2 + 0];
+          result.value.d = (double(m_pDriver->GetDeviceProps().limits.timestampPeriod) *
+                            double(delta))                  // nanoseconds
+                           / (1000.0 * 1000.0 * 1000.0);    // to seconds
+
+          ret.push_back(result);
+        }
+      }
+    }
+    
+    // All dispatches
+    for(size_t i = 0; i < cb.m_DispatchCallsDurationResults.size(); ++i)
+    {
+      for(size_t c = 0; c < vkCounters.size(); c++)
+      {
+        CounterResult result;
+
+        result.eventId = cb.m_DispatchCallsDurationResults[i].first;
+        result.counter = vkCounters[c];
+
+        if(GPUCounter::EventGPUDurationDispatches == vkCounters[c])
+        {
+          uint64_t delta =
+              timeStampDataForDispatchCalls[i * 2 + 1] - timeStampDataForDispatchCalls[i * 2 + 0];
+          result.value.d = (double(m_pDriver->GetDeviceProps().limits.timestampPeriod) *
+                            double(delta))                  // nanoseconds
+                           / (1000.0 * 1000.0 * 1000.0);    // to seconds
+
+          ret.push_back(result);
+        }
+      }
+    }
+
+    // draw & dispatch count
+    for(size_t i = 0; i < cb.m_EventTypeResults.size(); ++i)
+    {
+      CounterResult result;
+      result.eventId = 0;
+      result.counter = GPUCounter::Count;
+      result.eventType = cb.m_EventTypeResults[i].second;
+      ret.push_back(result);
+    }
+    // End L2 sungxu
+
     // sort so that the alias results appear in the right places
     std::sort(ret.begin(), ret.end());
   }
@@ -1157,14 +1571,14 @@ rdcarray<CounterResult> VulkanReplay::FetchCounters(const rdcarray<GPUCounter> &
 
   // L2-qilincheng: Begin
   // Pass Duration
-  {
-    CounterResult result;
-    result.eventId = 0;
-    result.counter = GPUCounter::EventGPUDuration;
-    result.value.d = this->FetchDuration(eventMask);
-
-    ret.push_back(result);
-  }
+//   {
+//     CounterResult result;
+//     result.eventId = 65535;
+//     result.counter = GPUCounter::EventGPUDuration;
+//     result.value.d = this->FetchDuration(eventMask);
+// 
+//     ret.push_back(result);
+//   }
   // L2-qilincheng: End
 
   return ret;
@@ -1181,15 +1595,15 @@ struct VulkanGPUDurationCallback : public VulkanActionCallback
 
   ~VulkanGPUDurationCallback() { m_pDriver->SetActionCB(NULL); }
 
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd) override {}
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override {}
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) override { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override { return false; }
 
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) override {}
 
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) override
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   { }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) override
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) override
   {
     return false;
   }
@@ -1256,7 +1670,13 @@ struct VulkanGPUDurationCallback : public VulkanActionCallback
   rdcarray<rdcpair<uint32_t, uint32_t>> m_AliasEvents;
 };
 
-double VulkanReplay::FetchDuration(const rdcarray<uint8_t> &eventMask)
+double VulkanReplay::FetchDuration(
+#if defined(POP_DEBUG)
+    const rdcarray<EventStatusFiltered> &eventMask
+#else
+    const rdcarray<uint8_t> &eventMask
+#endif
+)
 {
   uint32_t maxEID = m_pDriver->GetMaxEID();
 
@@ -1297,8 +1717,6 @@ double VulkanReplay::FetchDuration(const rdcarray<uint8_t> &eventMask)
 
   // replay the events to perform all the queries
   m_pDriver->SetEventMask(eventMask);
-  m_pDriver->m_EventCount = 0;
-  m_pDriver->m_SimulationCount = 0;
   m_pDriver->ReplayLog(0, maxEID, eReplay_Full);
   m_pDriver->SetEventMask({});
 

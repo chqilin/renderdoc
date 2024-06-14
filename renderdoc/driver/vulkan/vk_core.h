@@ -25,6 +25,7 @@
 #pragma once
 
 #include "common/timing.h"
+#include "api/replay/data_types.h"
 #include "serialise/serialiser.h"
 #include "vk_common.h"
 #include "vk_info.h"
@@ -213,13 +214,13 @@ struct VulkanActionCallback
   // and do the real draw by returning true. OR they can do nothing in PreDraw,
   // do the real draw, then in PostDraw return true to apply the modifications
   // which are then undone in PostRedraw.
-  virtual void PreDraw(uint32_t eid, VkCommandBuffer cmd) = 0;
-  virtual bool PostDraw(uint32_t eid, VkCommandBuffer cmd) = 0;
+  virtual void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) = 0;
+  virtual bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) = 0;
   virtual void PostRedraw(uint32_t eid, VkCommandBuffer cmd) = 0;
 
   // same principle as above, but for dispatch calls
-  virtual void PreDispatch(uint32_t eid, VkCommandBuffer cmd) = 0;
-  virtual bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) = 0;
+  virtual void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) = 0;
+  virtual bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) = 0;
   virtual void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) = 0;
 
   // finally, these are for copy/blit/resolve/clear/etc
@@ -399,7 +400,7 @@ private:
   // util function to handle fetching the right eventId, calling any
   // aliases then calling PreDraw/PreDispatch.
   uint32_t HandlePreCallback(VkCommandBuffer commandBuffer,
-                             ActionFlags type = ActionFlags::Drawcall, uint32_t multiDrawOffset = 0);
+                             ActionFlags type = ActionFlags::Drawcall, uint32_t multiDrawOffset = 0, uint32_t evtType = 0);
 
   rdcarray<WindowingSystem> m_SupportedWindowSystems;
 
@@ -1010,14 +1011,23 @@ private:
   }
 
   // L2-qilincheng: Begin
-  int32_t m_EventCount;
-  int32_t m_SimulationCount;
+#if defined(POP_DEBUG)
+  rdcarray<EventStatusFiltered> m_EventMask;
+  void SetEventMask(const rdcarray<EventStatusFiltered> &eventMask) { m_EventMask = eventMask; }
+#else
   rdcarray<uint8_t> m_EventMask;
-  void SetEventMask(const rdcarray<uint8_t> &eventMask) 
-  {
-    m_EventMask = eventMask;
-  }
+  void SetEventMask(const rdcarray<uint8_t> &eventMask) { m_EventMask = eventMask; }
+#endif
+
   // L2-qilincheng: End
+
+  // Begin L2 sungxu : Render pass GPU duration time.
+public:
+  uint32_t m_FetchPhase = 0;
+//   uint32_t m_DrawCallCount = 0;
+//   uint32_t m_DispatchCallCount = 0;
+// private:
+  // End L2 sungxu
 
   bool ProcessChunk(ReadSerialiser &ser, VulkanChunk chunk);
   RDResult ContextReplayLog(CaptureState readType, uint32_t startEventID, uint32_t endEventID,
@@ -1057,6 +1067,10 @@ public:
   virtual ~WrappedVulkan();
 
   APIProperties APIProps;
+
+  // Begine L2 sungxu : Render pass GPu duration
+  uint32_t m_EventType = 0;
+  // End L2 sungxu
 
   const InstanceDeviceInfo &GetExtensions(VkResourceRecord *record) const
   {

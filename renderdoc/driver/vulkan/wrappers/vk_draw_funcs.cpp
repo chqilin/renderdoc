@@ -170,6 +170,8 @@ bool WrappedVulkan::Serialise_vkCmdDraw(SerialiserType &ser, VkCommandBuffer com
 
   Serialise_DebugMessages(ser);
 
+
+
   SERIALISE_CHECK_READ_ERRORS();
 
   if(IsReplayingAndReading())
@@ -182,12 +184,13 @@ bool WrappedVulkan::Serialise_vkCmdDraw(SerialiserType &ser, VkCommandBuffer com
       {
         commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-        uint32_t eventId = HandlePreCallback(commandBuffer);
+        uint32_t eventId =
+            HandlePreCallback(commandBuffer, ActionFlags::Drawcall, 0, (uint32_t) VulkanChunk::vkCmdDraw);
 
         ObjDisp(commandBuffer)
             ->CmdDraw(Unwrap(commandBuffer), vertexCount, instanceCount, firstVertex, firstInstance);
 
-        if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+        if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDraw))
         {
           ObjDisp(commandBuffer)
               ->CmdDraw(Unwrap(commandBuffer), vertexCount, instanceCount, firstVertex,
@@ -271,13 +274,13 @@ bool WrappedVulkan::Serialise_vkCmdDrawIndexed(SerialiserType &ser, VkCommandBuf
       {
         commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-        uint32_t eventId = HandlePreCallback(commandBuffer);
+        uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Drawcall, 0, (uint32_t)VulkanChunk::vkCmdDrawIndexed);
 
         ObjDisp(commandBuffer)
             ->CmdDrawIndexed(Unwrap(commandBuffer), indexCount, instanceCount, firstIndex,
                              vertexOffset, firstInstance);
 
-        if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+        if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDrawIndexed))
         {
           ObjDisp(commandBuffer)
               ->CmdDrawIndexed(Unwrap(commandBuffer), indexCount, instanceCount, firstIndex,
@@ -372,12 +375,12 @@ bool WrappedVulkan::Serialise_vkCmdDrawIndirect(SerialiserType &ser, VkCommandBu
         {
           commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-          uint32_t eventId = HandlePreCallback(commandBuffer);
+          uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Drawcall, 0, (uint32_t)VulkanChunk::vkCmdDrawIndirect);
 
           ObjDisp(commandBuffer)
               ->CmdDrawIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, count, stride);
 
-          if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+          if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDrawIndirect))
           {
             ObjDisp(commandBuffer)
                 ->CmdDrawIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, count, stride);
@@ -455,7 +458,7 @@ bool WrappedVulkan::Serialise_vkCmdDrawIndirect(SerialiserType &ser, VkCommandBu
                     ->CmdDrawIndirect(Unwrap(commandBuffer), Unwrap(m_IndirectBuffer.buf), 0, i + 1,
                                       stride);
 
-                if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+                if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDrawIndirect))
                 {
                   ObjDisp(commandBuffer)
                       ->CmdDrawIndirect(Unwrap(commandBuffer), Unwrap(m_IndirectBuffer.buf), 0,
@@ -789,12 +792,12 @@ bool WrappedVulkan::Serialise_vkCmdDrawIndexedIndirect(SerialiserType &ser,
         {
           commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-          uint32_t eventId = HandlePreCallback(commandBuffer);
+          uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Drawcall, 0, (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect);
 
           ObjDisp(commandBuffer)
               ->CmdDrawIndexedIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, count, stride);
 
-          if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+          if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect))
           {
             ObjDisp(commandBuffer)
                 ->CmdDrawIndexedIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, count,
@@ -837,13 +840,13 @@ bool WrappedVulkan::Serialise_vkCmdDrawIndexedIndirect(SerialiserType &ser,
             {
               for(uint32_t i = 0; i < count; i++)
               {
-                uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Drawcall, i + 1);
+                uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Drawcall, i + 1, (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect);
 
                 ObjDisp(commandBuffer)
                     ->CmdDrawIndexedIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, 1,
                                              stride);
 
-                if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer))
+                if(eventId && m_ActionCallback->PostDraw(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDrawIndexedIndirect))
                 {
                   ObjDisp(commandBuffer)
                       ->CmdDrawIndexedIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset, 1,
@@ -1163,11 +1166,11 @@ bool WrappedVulkan::Serialise_vkCmdDispatch(SerialiserType &ser, VkCommandBuffer
       {
         commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-        uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Dispatch);
+        uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Dispatch, 0, (uint32_t)VulkanChunk::vkCmdDispatch);
 
         ObjDisp(commandBuffer)->CmdDispatch(Unwrap(commandBuffer), x, y, z);
 
-        if(eventId && m_ActionCallback->PostDispatch(eventId, commandBuffer))
+        if(eventId && m_ActionCallback->PostDispatch(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDispatch))
         {
           ObjDisp(commandBuffer)->CmdDispatch(Unwrap(commandBuffer), x, y, z);
           m_ActionCallback->PostRedispatch(eventId, commandBuffer);
@@ -1239,11 +1242,11 @@ bool WrappedVulkan::Serialise_vkCmdDispatchIndirect(SerialiserType &ser,
       {
         commandBuffer = RerecordCmdBuf(m_LastCmdBufferID);
 
-        uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Dispatch);
+        uint32_t eventId = HandlePreCallback(commandBuffer, ActionFlags::Dispatch, 0, (uint32_t)VulkanChunk::vkCmdDispatchIndirect);
 
         ObjDisp(commandBuffer)->CmdDispatchIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset);
 
-        if(eventId && m_ActionCallback->PostDispatch(eventId, commandBuffer))
+        if(eventId && m_ActionCallback->PostDispatch(eventId, commandBuffer, (uint32_t)VulkanChunk::vkCmdDispatchIndirect))
         {
           ObjDisp(commandBuffer)->CmdDispatchIndirect(Unwrap(commandBuffer), Unwrap(buffer), offset);
           m_ActionCallback->PostRedispatch(eventId, commandBuffer);

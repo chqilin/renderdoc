@@ -756,23 +756,30 @@ template <typename ParamSerialiser, typename ReturnSerialiser>
 rdcarray<CounterResult> ReplayProxy::Proxied_FetchCounters(ParamSerialiser &paramser,
                                                            ReturnSerialiser &retser,
                                                            const rdcarray<GPUCounter> &counters,
-                                                           const rdcarray<uint8_t> &eventMask)
+                                                       #if defined(POP_DEBUG)
+                                                           const rdcarray<EventStatusFiltered> &eventMask,
+                                                       #else
+                                                           const rdcarray<uint8_t> &eventMask,
+                                                       #endif
+                                                           uint32_t Phase)
 {
   const ReplayProxyPacket expectedPacket = eReplayProxy_FetchCounters;
   ReplayProxyPacket packet = eReplayProxy_FetchCounters;
   rdcarray<CounterResult> ret;
 
+  // Serialize RPC parameters.
   {
     BEGIN_PARAMS();
     SERIALISE_ELEMENT(counters);
     SERIALISE_ELEMENT(eventMask);
+    SERIALISE_ELEMENT(Phase);
     END_PARAMS();
   }
 
   {
     REMOTE_EXECUTION();
     if(paramser.IsReading() && !paramser.IsErrored() && !m_IsErrored)
-      ret = m_Remote->FetchCounters(counters, eventMask);    
+      ret = m_Remote->FetchCounters(counters, eventMask, Phase);    
   }
 
   SERIALISE_RETURN(ret);
@@ -781,9 +788,14 @@ rdcarray<CounterResult> ReplayProxy::Proxied_FetchCounters(ParamSerialiser &para
 }
 
 rdcarray<CounterResult> ReplayProxy::FetchCounters(const rdcarray<GPUCounter> &counters,
-                                                   const rdcarray<uint8_t> &eventMask)
+                                                #if defined(POP_DEBUG)
+                                                   const rdcarray<EventStatusFiltered> &eventMask,
+                                                #else
+                                                   const rdcarray<uint8_t> &eventMask,
+                                                #endif
+                                                   uint32_t Phase)
 {
-  PROXY_FUNCTION(FetchCounters, counters, eventMask);
+  PROXY_FUNCTION(FetchCounters, counters, eventMask, Phase);
 }
 
 template <typename ParamSerialiser, typename ReturnSerialiser>
@@ -2914,8 +2926,14 @@ bool ReplayProxy::Tick(int type)
     case eReplayProxy_FetchCounters:
     {
       rdcarray<GPUCounter> counters;
+
+#if defined(POP_DEBUG)
+      rdcarray<EventStatusFiltered> eventMask;
+#else
       rdcarray<uint8_t> eventMask;
-      FetchCounters(counters, eventMask);
+#endif
+
+      FetchCounters(counters, eventMask, 8);
       break;
     }
     case eReplayProxy_EnumerateCounters: EnumerateCounters(); break;

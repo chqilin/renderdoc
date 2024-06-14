@@ -928,6 +928,11 @@ enum class VulkanChunk : uint32_t
   Max,
 };
 
+// Begin L2 sungxu : Render pass GPU  duration
+extern const char *VkChunkTypeString[178];
+const char *GetVkChunkTypeString(VulkanChunk chunk);
+// End L2 sungxu
+
 DECLARE_REFLECTION_ENUM(VulkanChunk);
 
 // this is special - these serialise overloads will fetch the ID during capture, serialise the ID

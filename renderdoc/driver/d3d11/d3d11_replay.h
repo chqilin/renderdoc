@@ -246,8 +246,13 @@ public:
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
   rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
-                                        const rdcarray<uint8_t> &eventMask);
-  void FetchDuration(const ActionDescription &actionnode, ID3D11Query** before, ID3D11Query** after);
+                                    #if defined(POP_DEBUG)
+                                        const rdcarray<EventStatusFiltered> &eventMask,
+                                    #else
+                                        const rdcarray<uint8_t> &eventMask,
+                                    #endif
+                                        uint32_t Phase = 3);
+  void FetchDuration(const ActionDescription &actionnode, ID3D11Query **before, ID3D11Query **after);
   void GetEventRange(const ActionDescription &actionnode, uint32_t &beginEvent, uint32_t &endEvent);
 
   ResourceId CreateProxyTexture(const TextureDescription &templateTex);

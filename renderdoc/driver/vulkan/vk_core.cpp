@@ -37,6 +37,64 @@
 
 #include "stb/stb_image_write.h"
 
+// Begin L2 sungxu : for debug
+#if ENABLED(RDOC_ANDROID)
+#include <dlfcn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unwind.h>
+
+struct BacktraceState
+{
+  void **current;
+  void **end;
+};
+
+static _Unwind_Reason_Code unwind_callback(struct _Unwind_Context *context, void *arg)
+{
+  struct BacktraceState *state = (struct BacktraceState *)arg;
+  uintptr_t pc = _Unwind_GetIP(context);
+  if(pc)
+  {
+    if(state->current == state->end)
+    {
+      return _URC_END_OF_STACK;
+    }
+    else
+    {
+      *state->current++ = (void *)pc;
+    }
+  }
+  return _URC_NO_REASON;
+}
+
+size_t capture_backtrace(void **buffer, size_t max)
+{
+  struct BacktraceState state = {buffer, buffer + max};
+  _Unwind_Backtrace(unwind_callback, &state);
+  return state.current - buffer;
+}
+
+void print_backtrace(void **buffer, size_t count)
+{
+  for(size_t idx = 0; idx < count; ++idx)
+  {
+    const void *addr = buffer[idx];
+    Dl_info info;
+    if(dladdr(addr, &info) && info.dli_sname)
+    {
+      RDCLOG("%p : %s\n", addr, info.dli_sname);
+    }
+    else
+    {
+      RDCLOG("%p\n", addr);
+    }
+  }
+}
+#endif
+
+// End L2 sungxu
+
 RDOC_EXTERN_CONFIG(bool, Vulkan_Debug_VerboseCommandRecording);
 
 RDOC_DEBUG_CONFIG(bool, Vulkan_Debug_SingleSubmitFlushing, false,
@@ -610,7 +668,7 @@ void WrappedVulkan::InlineCleanupImageBarriers(VkCommandBuffer cmd, ImageBarrier
 }
 
 uint32_t WrappedVulkan::HandlePreCallback(VkCommandBuffer commandBuffer, ActionFlags type,
-                                          uint32_t multiDrawOffset)
+                                          uint32_t multiDrawOffset, uint32_t evtType)
 {
   if(!m_ActionCallback)
     return 0;
@@ -645,9 +703,9 @@ uint32_t WrappedVulkan::HandlePreCallback(VkCommandBuffer commandBuffer, ActionF
   eventId += multiDrawOffset;
   
   if(type == ActionFlags::Drawcall)
-    m_ActionCallback->PreDraw(eventId, commandBuffer);
+    m_ActionCallback->PreDraw(eventId, commandBuffer, evtType);
   else if(type == ActionFlags::Dispatch)
-    m_ActionCallback->PreDispatch(eventId, commandBuffer);
+    m_ActionCallback->PreDispatch(eventId, commandBuffer, evtType);
   else
     m_ActionCallback->PreMisc(eventId, type, commandBuffer);
 
@@ -2764,7 +2822,8 @@ RDResult WrappedVulkan::ReadLogInitialisation(RDCFile *rdc, bool storeStructured
 
       for(auto it = m_CreationInfo.m_Memory.begin(); it != m_CreationInfo.m_Memory.end(); ++it)
         it->second.SimplifyBindings();
-
+      
+      m_FetchPhase = 3;
       RDResult status = ContextReplayLog(m_State, 0, 0, false);
 
       if(status != ResultCode::Succeeded)
@@ -2841,6 +2900,12 @@ RDResult WrappedVulkan::ReadLogInitialisation(RDCFile *rdc, bool storeStructured
 RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEventID,
                                          uint32_t endEventID, bool partial)
 {
+#if ENABLED(RDOC_ANDROID)
+  const size_t max_frames = 64;
+  void *buffer[max_frames];
+  size_t frame_count = capture_backtrace(buffer, max_frames);
+  print_backtrace(buffer, frame_count);
+#endif
   m_FrameReader->SetOffset(0);
 
   ReadSerialiser ser(m_FrameReader, Ownership::Nothing);
@@ -2938,7 +3003,27 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
 
   uint64_t startOffset = ser.GetReader()->GetOffset();
 
-  bool bSimulation = true;
+  //m_DrawCallCount = 0;
+  //m_DispatchCallCount = 0;
+  RDCLOG("SXU -> Fetch Phase = %u", m_FetchPhase);
+
+#if defined(RENDERDOC_PLATFORM_WIN32)
+#if defined(POP_DEBUG)
+  for(size_t i = 0; i < m_EventMask.size(); ++i)
+  {
+    RDCLOG("SXU -> EventMask[%u] Vis %s, EventID %u, Name %s", 
+        i, m_EventMask[i].m_EventVisibile ? "true" : "false"
+        ,m_EventMask[i].m_EventId, m_EventMask[i].m_EventName.c_str()
+      );
+  }
+#endif
+#else
+  for(size_t i = 0; i < m_EventMask.size(); ++i)
+  {
+    RDCLOG("SXU -> EventMask[%u] Vis %s", i,
+           m_EventMask[i] > 0 ? "true" : "false");
+  }
+#endif
 
   for(;;)
   {
@@ -2953,6 +3038,31 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
 
     VulkanChunk chunktype = ser.ReadChunk<VulkanChunk>();
 
+    // Begin L2 sungxu : Render pass GPU duration time.
+    m_EventType = (uint32_t)chunktype;
+
+    uint32_t ActionEventId = 0;
+#ifdef POP_DEBUG
+    for(size_t ActionIndex = 0; ActionIndex < m_ActionUses.size(); ++ActionIndex)
+    {
+      RDCLOG("SXU -> ActionUses[%u] : FileOffset %u, EventID %u", ActionIndex, m_ActionUses[ActionIndex].fileOffset,
+             m_ActionUses[ActionIndex].eventId);
+    }
+#endif
+
+    for(size_t ActionIndex = 0; ActionIndex < m_ActionUses.size(); ++ActionIndex)
+    {
+      if(m_ActionUses[ActionIndex].fileOffset == m_CurChunkOffset)
+      {
+        ActionEventId = m_ActionUses[ActionIndex].eventId;
+#ifdef POP_DEBUG
+        RDCLOG("SXU -> Current EventID = %u", ActionEventId);
+#endif
+        break;
+      }
+    }
+    // End L2 sungxu
+
     if(ser.GetReader()->IsErrored())
       return RDResult(ResultCode::APIDataCorrupted, ser.GetError().message);
 
@@ -2960,34 +3070,40 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
 
     m_LastCmdBufferID = ResourceId();
 
-    // L2-qilincheng: Begin
-    if(!bSimulation)
-    {
-      if(chunktype != VulkanChunk::vkCmdDraw && 
-          chunktype != VulkanChunk::vkCmdDrawIndexed &&
-         chunktype != VulkanChunk::vkCmdDrawIndexedIndirect &&
-          chunktype != VulkanChunk::vkCmdDrawIndexedIndirectCount && 
-          chunktype != VulkanChunk::vkCmdDrawIndirect && 
-          chunktype != VulkanChunk::vkCmdDrawIndirectByteCountEXT && 
-          chunktype != VulkanChunk::vkCmdDrawIndirectCount && 
-          chunktype != VulkanChunk::vkCmdWriteBufferMarkerAMD && 
-          chunktype != VulkanChunk::vkCmdDispatch && 
-          chunktype != VulkanChunk::vkCmdDispatchBase &&
-         chunktype != VulkanChunk::vkCmdDispatchIndirect)
-      {
-        bSimulation = true;
-      }
-    }
-
     bool success = true;
-    m_EventCount++;
-    if(bSimulation)
+
+    // Begin L2 sungxu : Render pass GPU duration
+    if(m_FetchPhase == 0 || m_FetchPhase == 3)
     {
-      m_SimulationCount++;
       success = ContextProcessChunk(ser, chunktype);
     }
-    // L2-qilincheng: End
-
+    else
+    {
+#if defined(POP_DEBUG)
+      bool IsEventVisible = m_EventMask[ActionEventId].m_EventVisibile;
+#else
+      bool IsEventVisible = m_EventMask[ActionEventId];
+#endif
+      bool IsDrawOrDispatch =
+          (chunktype == VulkanChunk::vkCmdDraw || chunktype == VulkanChunk::vkCmdDrawIndexed ||
+           chunktype == VulkanChunk::vkCmdDrawIndexed ||
+           chunktype == VulkanChunk::vkCmdDrawIndexedIndirect ||
+           chunktype == VulkanChunk::vkCmdDispatch ||
+           chunktype == VulkanChunk::vkCmdDispatchIndirect);
+      if(IsDrawOrDispatch)
+      {
+        if (!IsEventVisible)
+        {
+          success = ContextProcessChunk(ser, chunktype);  
+        }
+      }
+      else
+      {
+        success = ContextProcessChunk(ser, chunktype);
+      }
+    }
+    // End L2 sungxu
+    
     ser.EndChunk();
 
     if(ser.GetReader()->IsErrored())
@@ -3045,28 +3161,20 @@ RDResult WrappedVulkan::ContextReplayLog(CaptureState readType, uint32_t startEv
     if(m_LastCmdBufferID == ResourceId() || startEventID > 1)
     {
       m_RootEventID++;
-
       if(startEventID > 1)
+      {
         ser.GetReader()->SetOffset(GetEvent(m_RootEventID).fileOffset);
+      }
     }
     else
     {
       // these events are completely omitted, so don't increment the curEventID
       if(chunktype != VulkanChunk::vkBeginCommandBuffer &&
          chunktype != VulkanChunk::vkEndCommandBuffer)
+      {
         m_BakedCmdBufferInfo[m_LastCmdBufferID].curEventID++;
+      }
     }
-
-    // L2-qilincheng: Begin
-    auto curEventID = m_LastCmdBufferID != ResourceId()
-                           ? m_BakedCmdBufferInfo[m_LastCmdBufferID].curEventID
-                           : m_RootEventID;
-    bSimulation = true;
-    if(curEventID < m_EventMask.size() && !m_EventMask[curEventID])
-    {
-      bSimulation = false;
-    }
-    // L2-qilincheng: End
   }
 
   if(!partial && !IsStructuredExporting(m_State))
@@ -3512,15 +3620,23 @@ bool WrappedVulkan::ProcessChunk(ReadSerialiser &ser, VulkanChunk chunk)
           ser, VK_NULL_HANDLE, 0, NULL, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, NULL, 0, NULL, 0, NULL);
 
-    case VulkanChunk::vkCmdDraw: return Serialise_vkCmdDraw(ser, VK_NULL_HANDLE, 0, 0, 0, 0);
+    case VulkanChunk::vkCmdDraw:
+      //m_DrawCallCount++;
+      return Serialise_vkCmdDraw(ser, VK_NULL_HANDLE, 0, 0, 0, 0);
     case VulkanChunk::vkCmdDrawIndirect:
+      //m_DrawCallCount++;
       return Serialise_vkCmdDrawIndirect(ser, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0, 0);
     case VulkanChunk::vkCmdDrawIndexed:
+      //m_DrawCallCount++;
       return Serialise_vkCmdDrawIndexed(ser, VK_NULL_HANDLE, 0, 0, 0, 0, 0);
     case VulkanChunk::vkCmdDrawIndexedIndirect:
+      //m_DrawCallCount++;
       return Serialise_vkCmdDrawIndexedIndirect(ser, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0, 0);
-    case VulkanChunk::vkCmdDispatch: return Serialise_vkCmdDispatch(ser, VK_NULL_HANDLE, 0, 0, 0);
+    case VulkanChunk::vkCmdDispatch: 
+      //m_DispatchCallCount++;
+      return Serialise_vkCmdDispatch(ser, VK_NULL_HANDLE, 0, 0, 0);
     case VulkanChunk::vkCmdDispatchIndirect:
+      //m_DispatchCallCount++;
       return Serialise_vkCmdDispatchIndirect(ser, VK_NULL_HANDLE, VK_NULL_HANDLE, 0);
 
     case VulkanChunk::vkCmdDebugMarkerBeginEXT:

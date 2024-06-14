@@ -3508,6 +3508,22 @@ enumerated with IDs in the appropriate ranges.
 
   Number of times a :data:`compute shader <ShaderStage.Compute>` was invoked.
 
+.. data:: RenderPassGPUDuration
+
+  Time taken for vkCmdBeginRenderPass & vmCmdEndRenderPass on the GPU, as measured by delta between two GPU timestamps.
+
+.. data:: BeginRenderPassGPUDuration
+
+  Time taken for vkCmdBeginRenderPass event on the GPU, as measured by delta between two GPU timestamps.
+
+.. data:: EventGPUDurationDrawCalls
+
+  Time taken for draw calls events on the GPU, as measured by delta between two GPU timestamps.
+
+.. data:: EventGPUDurationDispatches
+
+  Time taken for dispatch calls events on the GPU, as measured by delta between two GPU timestamps.
+
 .. data:: FirstAMD
 
   The AMD-specific counter IDs start from this value.
@@ -3567,6 +3583,12 @@ enum class GPUCounter : uint32_t
   PSInvocations,
   FSInvocations = PSInvocations,
   CSInvocations,
+  // Being L2 sungxu : Render pass GPU Duration.
+  RenderPassGPUDuration,
+  BeginRenderPassGPUDuration, // this for test
+  EventGPUDurationDrawCalls,
+  EventGPUDurationDispatches,
+  // End L2 sungxu
   Count,
 
   // IHV specific counters can be set above this point
@@ -4658,6 +4680,10 @@ enum class ActionFlags : uint32_t
   BeginPass = 0x400000,
   EndPass = 0x800000,
   CommandBufferBoundary = 0x1000000,
+  // Begin L2 sungxu : Render pass GPU duration time
+  BeginPassMobile = 0x2000000,
+  EndPassMobile = 0x4000000,
+  // End L2 sungxu
 };
 
 BITMASK_OPERATORS(ActionFlags);

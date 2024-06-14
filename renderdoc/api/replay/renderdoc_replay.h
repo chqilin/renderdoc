@@ -751,8 +751,16 @@ regions.
 :return: The list of counter results generated.
 :rtype: List[CounterResult]
 )");
+
+#if defined(POP_DEBUG)
   virtual rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
-                                                const rdcarray<uint8_t> &eventMask) = 0;
+                                                const rdcarray<EventStatusFiltered> &eventMask,
+                                                uint32_t Phase) = 0;
+#else
+  virtual rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
+                                                const rdcarray<uint8_t> &eventMask,
+                                                uint32_t Phase) = 0;
+#endif
 
   DOCUMENT(R"(Retrieve a list of which counters are available in the current capture analysis
 implementation.

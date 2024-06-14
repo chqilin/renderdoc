@@ -62,7 +62,7 @@ struct VulkanQuadOverdrawCallback : public VulkanActionCallback
       m_pDriver->vkDestroyPipelineLayout(dev, it->second.pipeLayout, NULL);
     }
   }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return;
@@ -236,7 +236,7 @@ struct VulkanQuadOverdrawCallback : public VulkanActionCallback
       pipestate.BindPipeline(m_pDriver, cmd, VulkanRenderState::BindGraphics, false);
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd)
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return false;
@@ -257,8 +257,8 @@ struct VulkanQuadOverdrawCallback : public VulkanActionCallback
   }
 
   // Dispatches don't rasterize, so do nothing
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) {}
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) {}
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   // Ditto copy/etc
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) {}

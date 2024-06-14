@@ -1842,7 +1842,7 @@ bool WrappedVulkan::Serialise_vkCmdBeginRenderPass(SerialiserType &ser, VkComman
           DoPipelineBarrier(commandBuffer, imgBarriers.size(), imgBarriers.data());
         }
 
-        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::BeginPass;
+        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::BeginPass | ActionFlags::BeginPassMobile;
         uint32_t eventId = HandlePreCallback(commandBuffer, drawFlags);
 
         ObjDisp(commandBuffer)->CmdBeginRenderPass(Unwrap(commandBuffer), &unwrappedInfo, contents);
@@ -1986,7 +1986,7 @@ bool WrappedVulkan::Serialise_vkCmdBeginRenderPass(SerialiserType &ser, VkComman
       ActionDescription action;
       action.customName =
           StringFormat::Fmt("vkCmdBeginRenderPass(%s)", MakeRenderPassOpString(false).c_str());
-      action.flags |= ActionFlags::PassBoundary | ActionFlags::BeginPass;
+      action.flags |= ActionFlags::PassBoundary | ActionFlags::BeginPass | ActionFlags::BeginPassMobile;
 
       AddAction(action);
     }
@@ -2251,12 +2251,12 @@ bool WrappedVulkan::Serialise_vkCmdEndRenderPass(SerialiserType &ser, VkCommandB
           renderstate.subpassContents = VK_SUBPASS_CONTENTS_MAX_ENUM;
         }
 
-        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::EndPass;
+        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::EndPass | ActionFlags::EndPassMobile;
         uint32_t eventId = HandlePreCallback(commandBuffer, drawFlags);
 
         ObjDisp(commandBuffer)->CmdEndRenderPass(Unwrap(commandBuffer));
 
-        if(eventId && m_ActionCallback->PostMisc(eventId, drawFlags, commandBuffer))
+        if(m_ActionCallback && eventId && m_ActionCallback->PostMisc(eventId, drawFlags, commandBuffer))
         {
           // Do not call vkCmdEndRenderPass again.
           m_ActionCallback->PostRemisc(eventId, drawFlags, commandBuffer);
@@ -2355,7 +2355,7 @@ bool WrappedVulkan::Serialise_vkCmdEndRenderPass(SerialiserType &ser, VkCommandB
       ActionDescription action;
       action.customName =
           StringFormat::Fmt("vkCmdEndRenderPass(%s)", MakeRenderPassOpString(true).c_str());
-      action.flags |= ActionFlags::PassBoundary | ActionFlags::EndPass;
+      action.flags |= ActionFlags::PassBoundary | ActionFlags::EndPass | ActionFlags::EndPassMobile;
 
       AddAction(action);
 
@@ -2492,7 +2492,7 @@ bool WrappedVulkan::Serialise_vkCmdBeginRenderPass2(SerialiserType &ser,
           DoPipelineBarrier(commandBuffer, imgBarriers.size(), imgBarriers.data());
         }
 
-        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::BeginPass;
+        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::BeginPass | ActionFlags::BeginPassMobile;
         uint32_t eventId = HandlePreCallback(commandBuffer, drawFlags);
 
         ObjDisp(commandBuffer)
@@ -2640,7 +2640,7 @@ bool WrappedVulkan::Serialise_vkCmdBeginRenderPass2(SerialiserType &ser,
       ActionDescription action;
       action.customName =
           StringFormat::Fmt("vkCmdBeginRenderPass2(%s)", MakeRenderPassOpString(false).c_str());
-      action.flags |= ActionFlags::PassBoundary | ActionFlags::BeginPass;
+      action.flags |= ActionFlags::PassBoundary | ActionFlags::BeginPass | ActionFlags::BeginPassMobile;
 
       AddAction(action);
     }
@@ -2944,7 +2944,7 @@ bool WrappedVulkan::Serialise_vkCmdEndRenderPass2(SerialiserType &ser, VkCommand
           renderstate.subpassContents = VK_SUBPASS_CONTENTS_MAX_ENUM;
         }
 
-        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::EndPass;
+        ActionFlags drawFlags = ActionFlags::PassBoundary | ActionFlags::EndPass | ActionFlags::EndPassMobile;
         uint32_t eventId = HandlePreCallback(commandBuffer, drawFlags);
         ObjDisp(commandBuffer)->CmdEndRenderPass2(Unwrap(commandBuffer), &unwrappedEndInfo);
 
@@ -3020,7 +3020,7 @@ bool WrappedVulkan::Serialise_vkCmdEndRenderPass2(SerialiserType &ser, VkCommand
       ActionDescription action;
       action.customName =
           StringFormat::Fmt("vkCmdEndRenderPass2(%s)", MakeRenderPassOpString(true).c_str());
-      action.flags |= ActionFlags::PassBoundary | ActionFlags::EndPass;
+      action.flags |= ActionFlags::PassBoundary | ActionFlags::EndPass | ActionFlags::EndPassMobile;
 
       AddAction(action);
 

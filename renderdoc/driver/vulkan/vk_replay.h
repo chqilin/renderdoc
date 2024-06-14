@@ -338,8 +338,20 @@ public:
   rdcarray<GPUCounter> EnumerateCounters();
   CounterDescription DescribeCounter(GPUCounter counterID);
   rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counters,
-                                        const rdcarray<uint8_t> &eventMask);
-  double FetchDuration(const rdcarray<uint8_t> &eventMask);
+                                    #if defined(POP_DEBUG)
+                                        const rdcarray<EventStatusFiltered> &eventMask,
+                                    #else
+                                        const rdcarray<uint8_t> &eventMask,
+                                    #endif
+                                        uint32_t Phase = 3);
+
+  double FetchDuration(                                            
+                    #if defined(POP_DEBUG)
+                      const rdcarray<EventStatusFiltered> &eventMask
+                    #else
+                      const rdcarray<uint8_t> &eventMask
+                    #endif
+  );
 
   void PickPixel(ResourceId texture, uint32_t x, uint32_t y, const Subresource &sub,
                  CompType typeCast, float pixel[4]);

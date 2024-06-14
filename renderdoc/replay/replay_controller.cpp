@@ -412,13 +412,18 @@ void ReplayController::AddFakeMarkers()
 }
 
 rdcarray<CounterResult> ReplayController::FetchCounters(const rdcarray<GPUCounter> &counters,
-                                                        const rdcarray<uint8_t> &eventMask)
+                                                    #if defined(POP_DEBUG)
+                                                        const rdcarray<EventStatusFiltered> &eventMask,
+                                                    #else
+                                                        const rdcarray<uint8_t> &eventMask,
+                                                    #endif
+                                                        uint32_t Phase)
 {
   CHECK_REPLAY_THREAD();
 
   RENDERDOC_PROFILEFUNCTION();
 
-  rdcarray<CounterResult> ret = m_pDevice->FetchCounters(counters, eventMask);
+  rdcarray<CounterResult> ret = m_pDevice->FetchCounters(counters, eventMask, Phase);
   FatalErrorCheck();
   return ret;
 }

@@ -232,21 +232,21 @@ struct VulkanNvidiaActionCallback final : public VulkanActionCallback
     m_driver->SetActionCB(this);
   }
   ~VulkanNvidiaActionCallback() { m_driver->SetActionCB(NULL); }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd) final
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) final
   {
     rdcstr eidName = StringFormat::Fmt("%d", eid);
     nv::perf::profiler::VulkanPushRange(Unwrap(cmd), eidName.c_str());
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) final
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) final
   {
     nv::perf::profiler::VulkanPopRange(Unwrap(cmd));
     return false;
   }
 
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) final {}
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) final { PreDraw(eid, cmd); }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) final { return PostDraw(eid, cmd); }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) final { PreDraw(eid, cmd, type); }
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) final { return PostDraw(eid, cmd, type); }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) final {}
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) final
   {

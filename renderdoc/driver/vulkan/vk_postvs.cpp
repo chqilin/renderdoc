@@ -3566,17 +3566,17 @@ struct VulkanInitPostVSCallback : public VulkanActionCallback
     m_pDriver->SetActionCB(this);
   }
   ~VulkanInitPostVSCallback() { m_pDriver->SetActionCB(NULL); }
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(m_Events.contains(eid))
       m_pDriver->GetReplay()->InitPostVSBuffers(eid, m_pDriver->GetCmdRenderState());
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) {}
   // Dispatches don't rasterize, so do nothing
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) {}
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) {}
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   // Ditto copy/etc
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) {}

@@ -490,10 +490,15 @@ public:
 
   IMPLEMENT_FUNCTION_PROXIED(rdcarray<GPUCounter>, EnumerateCounters);
   IMPLEMENT_FUNCTION_PROXIED(CounterDescription, DescribeCounter, GPUCounter counterID);
+#if defined(POP_DEBUG)
   IMPLEMENT_FUNCTION_PROXIED(rdcarray<CounterResult>, FetchCounters,
                              const rdcarray<GPUCounter> &counterID,
-                             const rdcarray<uint8_t> &eventMask);
-
+                             const rdcarray<EventStatusFiltered> &eventMask, uint32_t Phase);
+#else
+  IMPLEMENT_FUNCTION_PROXIED(rdcarray<CounterResult>, FetchCounters,
+                             const rdcarray<GPUCounter> &counterID,
+                             const rdcarray<uint8_t> &eventMask, uint32_t Phase);
+#endif
   IMPLEMENT_FUNCTION_PROXIED(void, FillCBufferVariables, ResourceId pipeline, ResourceId shader,
                              ShaderStage stage, rdcstr entryPoint, uint32_t cbufSlot,
                              rdcarray<ShaderVariable> &outvars, const bytebuf &data);

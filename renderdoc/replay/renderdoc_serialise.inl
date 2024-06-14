@@ -922,10 +922,13 @@ template <typename SerialiserType>
 void DoSerialise(SerialiserType &ser, CounterResult &el)
 {
   SERIALISE_MEMBER(eventId);
+  // Begin L2 sungxu : Render pass GPU duration
+  SERIALISE_MEMBER(eventType);
+  // End L2 sungxu
   SERIALISE_MEMBER(counter);
   SERIALISE_MEMBER(value);
 
-  SIZE_CHECK(16);
+  SIZE_CHECK(24);
 }
 
 template <typename SerialiserType>

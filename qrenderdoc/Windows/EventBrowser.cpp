@@ -3739,7 +3739,7 @@ void EventBrowser::on_timeActions_clicked()
   ui->events->header()->showSection(COL_DURATION);
 
   m_Ctx.Replay().AsyncInvoke([this](IReplayController *r) {
-    m_Model->SetTimes(r->FetchCounters({GPUCounter::EventGPUDuration}, {}));
+    m_Model->SetTimes(r->FetchCounters({GPUCounter::EventGPUDuration}, {}, 3));
 
     GUIInvoke::call(this, [this]() { ui->events->update(); });
   });

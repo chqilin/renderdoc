@@ -1939,34 +1939,47 @@ DOCUMENT("The resulting value from a counter at an event.");
 struct CounterResult
 {
 #if defined(SWIG) || defined(SWIGPYTHON)
-  CounterResult() : eventId(0), counter(uint32_t(GPUCounter::EventGPUDuration)) { value.u64 = 0; }
+  CounterResult() : eventId(0), eventType(0), counter(uint32_t(GPUCounter::EventGPUDuration)) { value.u64 = 0; }
   CounterResult(const CounterResult &) = default;
-  CounterResult(uint32_t e, GPUCounter c, float data) : eventId(e), counter(uint32_t(c))
+  CounterResult(uint32_t e, GPUCounter c, float data)
+      : eventId(e), eventType(0), counter(uint32_t(c))
   {
     value.f = data;
   }
-  CounterResult(uint32_t e, GPUCounter c, double data) : eventId(e), counter(uint32_t(c))
+  CounterResult(uint32_t e, GPUCounter c, double data)
+      : eventId(e), eventType(0), counter(uint32_t(c))
   {
     value.d = data;
   }
-  CounterResult(uint32_t e, GPUCounter c, uint32_t data) : eventId(e), counter(uint32_t(c))
+  CounterResult(uint32_t e, GPUCounter c, uint32_t data)
+      : eventId(e), eventType(0), counter(uint32_t(c))
   {
     value.u32 = data;
   }
-  CounterResult(uint32_t e, GPUCounter c, uint64_t data) : eventId(e), counter(uint32_t(c))
+  CounterResult(uint32_t e, GPUCounter c, uint64_t data)
+      : eventId(e), eventType(0), counter(uint32_t(c))
   {
     value.u64 = data;
   }
 #else
-  CounterResult() : eventId(0), counter(GPUCounter::EventGPUDuration) { value.u64 = 0; }
+  CounterResult() : eventId(0), eventType(0), counter(GPUCounter::EventGPUDuration)
+  {
+    value.u64 = 0;
+  }
   CounterResult(const CounterResult &) = default;
-  CounterResult(uint32_t e, GPUCounter c, float data) : eventId(e), counter(c) { value.f = data; }
-  CounterResult(uint32_t e, GPUCounter c, double data) : eventId(e), counter(c) { value.d = data; }
-  CounterResult(uint32_t e, GPUCounter c, uint32_t data) : eventId(e), counter(c)
+  CounterResult(uint32_t e, GPUCounter c, float data) : eventId(e), eventType(0), counter(c)
+  {
+    value.f = data;
+  }
+  CounterResult(uint32_t e, GPUCounter c, double data) : eventId(e), eventType(0), counter(c)
+  {
+    value.d = data;
+  }
+  CounterResult(uint32_t e, GPUCounter c, uint32_t data) : eventId(e), eventType(0), counter(c)
   {
     value.u32 = data;
   }
-  CounterResult(uint32_t e, GPUCounter c, uint64_t data) : eventId(e), counter(c)
+  CounterResult(uint32_t e, GPUCounter c, uint64_t data) : eventId(e), eventType(0), counter(c)
   {
     value.u64 = data;
   }
@@ -1994,6 +2007,10 @@ struct CounterResult
 
   DOCUMENT("The :data:`eventId <APIEvent.eventId>` that produced this value.");
   uint32_t eventId;
+
+  // Begin L2 sungxu : Render pass GPU duration
+  uint32_t eventType;
+  // End L2 sungxu
 
   DOCUMENT(R"(The :data:`counter <GPUCounter>` that produced this value, stored as an int.
 
@@ -2239,3 +2256,41 @@ struct Thumbnail
 };
 
 DECLARE_REFLECTION_STRUCT(Thumbnail);
+
+
+// Begin L2 sungxu : Render pass GPU duration
+DOCUMENT("Contains api status for filtered events in event browser.");
+class EventStatusFiltered
+{
+public:
+  DOCUMENT("");
+  EventStatusFiltered() = default;
+  EventStatusFiltered(const EventStatusFiltered &) = default;
+  EventStatusFiltered &operator=(const EventStatusFiltered &) = default;
+  DOCUMENT("The :class:`ActionDescription` of a indexed event.");
+  ActionDescription* m_ActionDesc;
+
+  DOCUMENT("The :class:`rdcstr` name of a indexed event.");
+  rdcstr m_EventName;
+
+  DOCUMENT("``True`` if this event is visible in event browser.");
+  uint32_t m_EventId = 0;
+
+  DOCUMENT("``True`` if this event is visible in event browser.");
+  uint8_t m_EventVisibile = 1;
+
+  // Fix compile errors
+  bool operator==(const EventStatusFiltered &o) const
+  { 
+    return (
+    m_ActionDesc == o.m_ActionDesc && 
+    m_EventName == o.m_EventName && 
+    m_EventId == o.m_EventId && 
+    m_EventVisibile == o.m_EventVisibile 
+    );
+  }
+  
+  bool operator<(const EventStatusFiltered &o) const { return true; }
+};
+DECLARE_REFLECTION_STRUCT(EventStatusFiltered);
+// End L2 sungxu

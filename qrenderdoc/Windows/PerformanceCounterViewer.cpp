@@ -26,6 +26,7 @@
 #include "Code/QRDUtils.h"
 #include "Windows/Dialogs/PerformanceCounterSelection.h"
 #include "ui_PerformanceCounterViewer.h"
+#include "../../3rdparty/zstd/debug.h"
 
 static const int EIDRole = Qt::UserRole + 1;
 static const int SortDataRole = Qt::UserRole + 2;
@@ -316,6 +317,155 @@ PerformanceCounterViewer::~PerformanceCounterViewer()
   delete ui;
 }
 
+// Begin L2 sungxu : Render pass GPU duration
+
+const char *GetGPUCounterString(GPUCounter counter)
+{
+  switch(counter)
+  {
+    case GPUCounter::CSInvocations: return "CSInvocations";
+    case GPUCounter::EventGPUDuration: return "EventGPUDuration";
+    case GPUCounter::InputVerticesRead: return "InputVerticesRead";
+    case GPUCounter::IAPrimitives: return "IAPrimitives";
+    case GPUCounter::GSPrimitives: return "GSPrimitives";
+    case GPUCounter::RasterizerInvocations: return "RasterizerInvocations";
+    case GPUCounter::RasterizedPrimitives: return "RasterizedPrimitives";
+    case GPUCounter::SamplesPassed: return "SamplesPassed";
+    case GPUCounter::VSInvocations: return "VSInvocations";
+    //case GPUCounter::HSInvocations: return "HSInvocations";
+    case GPUCounter::TCSInvocations: return "TCSInvocations";
+    //case GPUCounter::DSInvocations: return "DSInvocations";
+    case GPUCounter::TESInvocations: return "TESInvocations";
+    //case GPUCounter::PSInvocations: return "PSInvocations";
+    case GPUCounter::FSInvocations: return "FSInvocations";
+    case GPUCounter::GSInvocations: return "GSInvocations";
+    case GPUCounter::RenderPassGPUDuration: return "RenderPassGPUDuration";
+    case GPUCounter::BeginRenderPassGPUDuration: return "BeginRenderPassGPUDuration";
+    case GPUCounter::EventGPUDurationDrawCalls: return "EventGPUDurationDrawCalls";
+    case GPUCounter::EventGPUDurationDispatches: return "EventGPUDurationDispatches";
+    default: break;
+  }
+  return "UnKnown";
+}
+
+struct TotalStatistics
+{
+  float TotalDrawAndDispatchCallDuration = 0.0f;
+  float TotalRenderPassDuration = 0.0f;
+  float TotalBeginRenderPassDuration = 0.0f;
+  float TotalDrawCallsDuration = 0.0f;
+  float TotalDispatchCallsDuration = 0.0f;
+
+  uint32_t TotalNoIndirectDrawCalls = 0;
+  uint32_t TotalIndirectDrawCalls = 0;
+  uint32_t TotalNoIndirectDispatches = 0;
+  uint32_t TotalIndirectDispatches = 0;
+
+  uint32_t TotalInputVerticesRead = 0;
+  uint32_t TotalIAPrimitives = 0;
+  uint32_t TotalVSInvocations = 0;
+  uint32_t TotalPSInvocations = 0;
+  uint32_t TotalCSInvocations = 0;
+};
+
+void StatisticsSubtraction(const TotalStatistics& left, const TotalStatistics& right, TotalStatistics& out)
+{
+  out.TotalDrawAndDispatchCallDuration = left.TotalDrawAndDispatchCallDuration - right.TotalDrawAndDispatchCallDuration;
+  out.TotalDrawCallsDuration = left.TotalDrawCallsDuration - right.TotalDrawCallsDuration;
+  out.TotalDispatchCallsDuration = left.TotalDispatchCallsDuration - right.TotalDispatchCallsDuration;
+  out.TotalRenderPassDuration = left.TotalRenderPassDuration - right.TotalRenderPassDuration;
+  out.TotalBeginRenderPassDuration = left.TotalBeginRenderPassDuration - right.TotalBeginRenderPassDuration;
+
+  out.TotalNoIndirectDrawCalls = left.TotalNoIndirectDrawCalls - right.TotalNoIndirectDrawCalls;
+  out.TotalIndirectDrawCalls = left.TotalIndirectDrawCalls - right.TotalIndirectDrawCalls;
+  out.TotalNoIndirectDispatches = left.TotalNoIndirectDispatches - right.TotalNoIndirectDispatches;
+  out.TotalIndirectDispatches = left.TotalIndirectDispatches - right.TotalIndirectDispatches;
+  //
+  out.TotalInputVerticesRead = left.TotalInputVerticesRead - right.TotalInputVerticesRead;
+  out.TotalIAPrimitives = left.TotalIAPrimitives - right.TotalIAPrimitives;
+  out.TotalVSInvocations = left.TotalVSInvocations - right.TotalVSInvocations;
+  out.TotalPSInvocations = left.TotalPSInvocations - right.TotalPSInvocations;
+  out.TotalCSInvocations = left.TotalCSInvocations - right.TotalCSInvocations;
+}
+
+void StstisticsProcessing(TotalStatistics &StatisticsPhase, rdcarray<CounterResult> &results, rdcarray<GPUCounter>& counters)
+{
+  for(size_t resultIdx = 0; resultIdx < results.size(); ++resultIdx)
+  {
+    CounterResult &result = results[resultIdx];
+    if(result.counter == GPUCounter::EventGPUDuration)
+    {
+      StatisticsPhase.TotalDrawAndDispatchCallDuration +=
+          result.value.d * 1000.0f;    // convert unit from us to ms.
+    }
+    else if(result.counter == GPUCounter::RenderPassGPUDuration)
+    {
+      StatisticsPhase.TotalRenderPassDuration +=
+          result.value.d * 1000.0f;    // convert unit from us to ms.
+    }
+    else if(result.counter == GPUCounter::BeginRenderPassGPUDuration)
+    {
+      StatisticsPhase.TotalBeginRenderPassDuration +=
+          result.value.d * 1000.0f;    // convert unit from us to ms.
+    }
+    else if(result.counter == GPUCounter::EventGPUDurationDrawCalls)
+    {
+      StatisticsPhase.TotalDrawCallsDuration +=
+          result.value.d * 1000.0f;    // convert unit from us to ms.
+    }
+    else if(result.counter == GPUCounter::EventGPUDurationDispatches)
+    {
+      StatisticsPhase.TotalDispatchCallsDuration +=
+          result.value.d * 1000.0f;    // convert unit from us to ms.
+    }
+    else if(result.counter == GPUCounter::InputVerticesRead)
+    {
+      StatisticsPhase.TotalInputVerticesRead += result.value.u32;
+    }
+    else if(result.counter == GPUCounter::IAPrimitives)
+    {
+      StatisticsPhase.TotalIAPrimitives += result.value.u32;
+    }
+    else if(result.counter == GPUCounter::VSInvocations)
+    {
+      StatisticsPhase.TotalVSInvocations += result.value.u32;
+    }
+    else if(result.counter == GPUCounter::PSInvocations)
+    {
+      StatisticsPhase.TotalPSInvocations += result.value.u32;
+    }
+    else if(result.counter == GPUCounter::CSInvocations)
+    {
+      StatisticsPhase.TotalCSInvocations += result.value.u32;
+    }
+
+    switch(result.eventType)
+    {
+      // Draws
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 83):
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 85):
+        StatisticsPhase.TotalNoIndirectDrawCalls++;
+        break;
+      // Indirect draws
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 84):
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 86):
+        StatisticsPhase.TotalIndirectDrawCalls++;
+        break;
+      // Dispatches
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 87):
+        StatisticsPhase.TotalNoIndirectDispatches++;
+        break;
+      // Indirect Dispatches
+      case(/*(uint32_t)SystemChunk::FirstDriverChunk*/ 1000 + 88):
+        StatisticsPhase.TotalIndirectDispatches++;
+        break;
+      default: break;
+    };
+  }
+}
+
+// End L2 sungxu
+
 void PerformanceCounterViewer::CaptureCounters()
 {
   if(!m_Ctx.IsCaptureLoaded())
@@ -342,130 +492,88 @@ void PerformanceCounterViewer::CaptureCounters()
       counterDescriptions.push_back(controller->DescribeCounter(counters[i]));
     }
 
-    rdcarray<CounterResult> results = controller->FetchCounters(counters, {});
-
-    // L2-qilincheng: Begin
-    // Prepare event-mask array
     auto *action = m_Ctx.GetLastAction();
     uint32_t maxEID = action->eventId;
 
-    rdcarray<uint8_t> eventMask;
-    eventMask.resize(maxEID + 1);
+    // Begin L2 sungxu : Render pass GPU duration
+    // L2-qilincheng: Begin
+    // Prepare event-mask array
+#if defined(POP_DEBUG)
+    rdcarray<EventStatusFiltered> eventStatusArray;
+    for (uint32_t eid = 0; eid <= maxEID; eid++)
+    {
+      EventStatusFiltered eventStatus;
+      eventStatus.m_ActionDesc = const_cast<ActionDescription*>(m_Ctx.GetEventBrowser()->GetActionForEID(eid));
+      eventStatus.m_EventName = m_Ctx.GetEventBrowser()->GetEventName(eid);
+      eventStatus.m_EventId = eid;
+      eventStatus.m_EventVisibile = m_Ctx.GetEventBrowser()->IsAPIEventVisible(eid) ? 1 : 0;
+      eventStatusArray.push_back(eventStatus);
+    }
+#else
+    rdcarray<uint8_t> eventStatusArray;
     for(uint32_t eid = 0; eid <= maxEID; eid++)
     {
-      bool bVisibleInEventBrowser = m_Ctx.GetEventBrowser()->IsAPIEventVisible(eid);
-      eventMask[eid] = bVisibleInEventBrowser ? 0x00 : 0x01;
+      eventStatusArray.push_back(m_Ctx.GetEventBrowser()->IsAPIEventVisible(eid) ? 1 : 0);
     }
-
-    // FetchCounter with event-mask
-    rdcarray<CounterResult> maskedResults = controller->FetchCounters(counters, eventMask);
-
-    // Because of we added a duration-counter in the results-array, We need get it value and remove it here.
-    auto SelectAndRemoveDurationCounter = [](rdcarray<CounterResult> &results) -> double {
-      double ms = 0;
-      for(size_t index = 0; index < results.size(); index++)
-      {
-        auto &r = results[index];
-        if(r.eventId == 0 && r.counter == GPUCounter::EventGPUDuration)
-        {
-          ms = r.value.d * 1000;    // to us.
-          results.erase(index);
-          break;
-        }
-      }
-      return ms;
-    };
-
-    // pass duration
-    double totalDuration = SelectAndRemoveDurationCounter(results);
-    double notmaskedDuration = SelectAndRemoveDurationCounter(maskedResults);
-
-    struct CounterStats
-    {
-      uint32_t events = 0;
-      double duration = 0;
-      uint32_t drawcalls = 0;
-      uint32_t verts = 0;
-      uint32_t tris = 0;
-
-      CounterStats operator-(const CounterStats &other)
-      {
-        CounterStats result;
-        result.events = this->events - other.events;
-        result.duration = this->duration - other.duration;
-        result.drawcalls = this->drawcalls - other.drawcalls;
-        result.verts = this->verts - other.verts;
-        result.tris = this->tris - other.tris;
-        return result;
-      }
-    };
-
-    CounterStats totalStats;
-    {
-      totalStats.events = (uint32_t)eventMask.size();
-      totalStats.duration = totalDuration;
-      totalStats.drawcalls = uint32_t(results.size() / counters.size());
-
-      for(size_t index = 0; index < results.size(); index++)
-      {
-        auto &r = results[index];
-        if(r.counter == GPUCounter::InputVerticesRead)
-          totalStats.verts += r.value.u64;
-        else if(r.counter == GPUCounter::IAPrimitives)
-          totalStats.tris += r.value.u64;
-      }
-    }
-
-    CounterStats maskedStats;
-    {
-      for(auto &mask : eventMask)
-      {
-        if(!mask)
-        {
-          maskedStats.events += 1;
-        }
-      }
-
-      maskedStats.duration = totalDuration - notmaskedDuration;
-
-      std::map<uint32_t, bool> maskedDrawCalls;
-      for(size_t index = 0; index < results.size(); index++)
-      {
-        auto &r = results[index];
-        if(eventMask[r.eventId])
-          continue;
-
-        maskedDrawCalls[r.eventId] = true;
-        if(r.counter == GPUCounter::InputVerticesRead)
-          maskedStats.verts += r.value.u64;
-        else if(r.counter == GPUCounter::IAPrimitives)
-          maskedStats.tris += r.value.u64;
-      }
-      maskedStats.drawcalls = (uint32_t)maskedDrawCalls.size();
-    }
+#endif
+    
     // L2-qilincheng: End
+    
+    // Do 1st step, FetchCounter without filters.
+    rdcarray<CounterResult> results = controller->FetchCounters(counters, eventStatusArray, 0);
+    TotalStatistics StatisticsFirstPhase;
+    StstisticsProcessing(StatisticsFirstPhase, results, counters);
+    // End L2 sungxu
 
-    GUIInvoke::call(this, [this, results, counterDescriptions, totalStats, maskedStats]() {
+    // Do 2nd step: FetchCounters with event-mask(filtered)
+    rdcarray<CounterResult> maskedResults = controller->FetchCounters(counters, eventStatusArray, 1);
+    TotalStatistics StatisticsSecondPhase;
+    StstisticsProcessing(StatisticsSecondPhase, maskedResults, counters);
+
+    GUIInvoke::call(this, [this, results, counterDescriptions, StatisticsFirstPhase, StatisticsSecondPhase]() {
       m_ItemModel->refresh(counterDescriptions, results);
 
       ui->counterResults->resizeColumnsToContents();
 
+      TotalStatistics StatisticsDifference;
+      StatisticsSubtraction(StatisticsFirstPhase, StatisticsSecondPhase, StatisticsDifference);
+
       // L2-qilincheng: Begin
-      char buf[1024] = {0};
+      char buf[2048] = {0};
       sprintf(buf,
-              "<table width='100%%' border='1' cellspacing='0' cellpadding='4'>"
-                  "<tr><td> </td>               <td> Total </td>        <td> Masked </td></tr>"
-                  "<tr><td> Events </td>        <td> %lu </td>          <td> %lu </td></tr>"
-                  "<tr><td> Time </td>          <td> %.3f ms </td>      <td> %.3f ms </td></tr>"
-                  "<tr><td> DrawCall </td>      <td> %lu </td>          <td> %lu </td></tr>"
-                  "<tr><td> Vertices </td>      <td> %lu </td>          <td> %lu </td></tr>"
-                  "<tr><td> Triangles </td>     <td> %lu </td>          <td> %lu </td></tr>"
+              "<table width='100%%' border='1' cellspacing='0' cellpadding='5'>"
+                  "<tr><td> </td>                          <td> Total </td>           <td> Unselected </td>   <td> Selected </td></tr>"
+                  "<tr><td> DrawAndDispatch </td>          <td> %.6fms </td>          <td> %.6fms </td>       <td> %.6fms </td></tr>"
+                  "<tr><td> DrawCallDuration </td>         <td> %.6fms </td>          <td> %.6fms </td>       <td> %.6fms </td></tr>"
+                  "<tr><td> DispatchCallDuration </td>     <td> %.6fms </td>          <td> %.6fms </td>       <td> %.6fms </td></tr>"
+                  "<tr><td> RenderPassDuration </td>       <td> %.6fms </td>          <td> %.6fms </td>       <td> %.6fms </td></tr>"
+                  "<tr><td> BeginRenderPassDuration </td>  <td> %.6fms </td>          <td> %.6fms </td>       <td> %.6fms </td></tr>"
+                  "<tr><td> NoIndirectDrawCall </td>       <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> IndirectDrawCall </td>         <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> NoIndirectDispatch </td>       <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> IndirectDispatch </td>         <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> Input Vertices Read </td>      <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> Input Primitives </td>         <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> VS Invocations </td>           <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> PS Invocations </td>           <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
+                  "<tr><td> CS Invocations </td>           <td> %u </td>              <td> %u </td>           <td> %u </td></tr>"
               "</table>",
-              totalStats.events, maskedStats.events, 
-              totalStats.duration, maskedStats.duration,
-              totalStats.drawcalls, maskedStats.drawcalls, 
-              totalStats.verts, maskedStats.verts,
-              totalStats.tris, maskedStats.tris);
+              StatisticsFirstPhase.TotalDrawAndDispatchCallDuration, StatisticsSecondPhase.TotalDrawAndDispatchCallDuration, StatisticsDifference.TotalDrawAndDispatchCallDuration,
+              StatisticsFirstPhase.TotalDrawCallsDuration,           StatisticsSecondPhase.TotalDrawCallsDuration,           StatisticsDifference.TotalDrawCallsDuration,
+              StatisticsFirstPhase.TotalDispatchCallsDuration,       StatisticsSecondPhase.TotalDispatchCallsDuration,       StatisticsDifference.TotalDispatchCallsDuration,
+              StatisticsFirstPhase.TotalRenderPassDuration,          StatisticsSecondPhase.TotalRenderPassDuration,          StatisticsDifference.TotalRenderPassDuration,
+              StatisticsFirstPhase.TotalBeginRenderPassDuration,     StatisticsSecondPhase.TotalBeginRenderPassDuration,     StatisticsDifference.TotalBeginRenderPassDuration,
+              StatisticsFirstPhase.TotalNoIndirectDrawCalls,         StatisticsSecondPhase.TotalNoIndirectDrawCalls,         StatisticsDifference.TotalNoIndirectDrawCalls,
+              StatisticsFirstPhase.TotalIndirectDrawCalls,           StatisticsSecondPhase.TotalIndirectDrawCalls,           StatisticsDifference.TotalIndirectDrawCalls,
+              StatisticsFirstPhase.TotalNoIndirectDispatches,        StatisticsSecondPhase.TotalNoIndirectDispatches,        StatisticsDifference.TotalNoIndirectDispatches,
+              StatisticsFirstPhase.TotalIndirectDispatches,          StatisticsSecondPhase.TotalIndirectDispatches,          StatisticsDifference.TotalIndirectDispatches,
+              //
+              StatisticsFirstPhase.TotalInputVerticesRead,           StatisticsSecondPhase.TotalInputVerticesRead,           StatisticsDifference.TotalInputVerticesRead,
+              StatisticsFirstPhase.TotalIAPrimitives,                StatisticsSecondPhase.TotalIAPrimitives,                StatisticsDifference.TotalIAPrimitives,
+              StatisticsFirstPhase.TotalVSInvocations,               StatisticsSecondPhase.TotalVSInvocations,               StatisticsDifference.TotalVSInvocations,
+              StatisticsFirstPhase.TotalPSInvocations,               StatisticsSecondPhase.TotalPSInvocations,               StatisticsDifference.TotalPSInvocations,
+              StatisticsFirstPhase.TotalCSInvocations,               StatisticsSecondPhase.TotalCSInvocations,               StatisticsDifference.TotalCSInvocations
+              );
       ui->statusText->setText(QString::fromUtf8(buf));
       // L2-qilincheng: End
     });

@@ -1465,7 +1465,7 @@ struct VulkanOcclusionCallback : public VulkanPixelHistoryCallback
       m_pDriver->vkDestroyPipeline(m_pDriver->GetDev(), it->second, NULL);
   }
 
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return;
@@ -1489,10 +1489,10 @@ struct VulkanOcclusionCallback : public VulkanPixelHistoryCallback
                                                 false);
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) {}
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) { return; }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return; }
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) { return; }
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) { return false; }
@@ -1607,7 +1607,7 @@ struct VulkanColorAndStencilCallback : public VulkanPixelHistoryCallback
     }
   }
 
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid) || !m_pDriver->IsCmdPrimary())
       return;
@@ -1685,7 +1685,7 @@ struct VulkanColorAndStencilCallback : public VulkanPixelHistoryCallback
       pipestate.BeginRenderPassAndApplyState(m_pDriver, cmd, VulkanRenderState::BindGraphics, true);
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd)
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid) || !m_pDriver->IsCmdPrimary())
       return false;
@@ -1823,14 +1823,14 @@ struct VulkanColorAndStencilCallback : public VulkanPixelHistoryCallback
           m_pDriver, cmd, VulkanRenderState::BindNone, true);
   }
 
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd)
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return;
     size_t storeOffset = m_EventIndices.size() * sizeof(EventInfo);
     CopyPixel(eid, cmd, storeOffset);
   }
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd)
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return false;
@@ -2090,7 +2090,7 @@ struct TestsFailedCallback : public VulkanPixelHistoryCallback
   }
 
   ~TestsFailedCallback() {}
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(!m_Events.contains(eid))
       return;
@@ -2120,7 +2120,7 @@ struct TestsFailedCallback : public VulkanPixelHistoryCallback
                                                 false);
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type) { return false; }
   void AliasEvent(uint32_t primary, uint32_t alias)
   {
     // TODO: handle aliased events.
@@ -2131,8 +2131,8 @@ struct TestsFailedCallback : public VulkanPixelHistoryCallback
     // nothing to do
   }
 
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) {}
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) {}
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) {}
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) { return false; }
@@ -2646,7 +2646,7 @@ struct VulkanPixelHistoryPerFragmentCallback : VulkanPixelHistoryCallback
     VkPipeline postModPipe;
   };
 
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(m_EventFragments.find(eid) == m_EventFragments.end())
       return;
@@ -2970,7 +2970,7 @@ struct VulkanPixelHistoryPerFragmentCallback : VulkanPixelHistoryCallback
     m_pDriver->GetCmdRenderState().BeginRenderPassAndApplyState(
         m_pDriver, cmd, VulkanRenderState::BindGraphics, true);
   }
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) {}
   // CreatePerFragmentPipelines for getting per fragment information.
   Pipelines CreatePerFragmentPipelines(ResourceId pipe, VkRenderPass rp, VkRenderPass origRpWithDepth,
@@ -3173,8 +3173,8 @@ struct VulkanPixelHistoryPerFragmentCallback : VulkanPixelHistoryCallback
     return pipes;
   }
 
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) {}
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) {}
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) {}
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) { return false; }
@@ -3234,7 +3234,7 @@ struct VulkanPixelHistoryDiscardedFragmentsCallback : VulkanPixelHistoryCallback
       m_pDriver->vkDestroyPipeline(m_pDriver->GetDev(), pipe, NULL);
   }
 
-  void PreDraw(uint32_t eid, VkCommandBuffer cmd)
+  void PreDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0)
   {
     if(m_Events.find(eid) == m_Events.end())
       return;
@@ -3315,10 +3315,10 @@ struct VulkanPixelHistoryDiscardedFragmentsCallback : VulkanPixelHistoryCallback
     return m_OcclusionResults[it->second] == 0;
   }
 
-  bool PostDraw(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  bool PostDraw(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedraw(uint32_t eid, VkCommandBuffer cmd) {}
-  void PreDispatch(uint32_t eid, VkCommandBuffer cmd) {}
-  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd) { return false; }
+  void PreDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) {}
+  bool PostDispatch(uint32_t eid, VkCommandBuffer cmd, uint32_t type = 0) { return false; }
   void PostRedispatch(uint32_t eid, VkCommandBuffer cmd) {}
   void PreMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) {}
   bool PostMisc(uint32_t eid, ActionFlags flags, VkCommandBuffer cmd) { return false; }

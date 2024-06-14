@@ -139,6 +139,16 @@ rdcstr DoStringise(const PointerVal &el)
   }
 }
 
+// Begin L2 sungxu : Render pass GPU duration
+// Fix link errors and bugs. Serialize for android RPC, or we will get empty parameters.
+template <class SerialiserType>
+void DoSerialise(SerialiserType &ser, EventStatusFiltered& el)
+{
+
+}
+INSTANTIATE_SERIALISE_TYPE(EventStatusFiltered);
+// End L2 sungxu
+
 template <class SerialiserType>
 void DoSerialise(SerialiserType &ser, ResourceId &el)
 {

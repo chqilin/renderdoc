@@ -917,6 +917,12 @@ rdcstr DoStringise(const GPUCounter &el)
     STRINGISE_ENUM_CLASS(GSInvocations);
     STRINGISE_ENUM_CLASS(PSInvocations);
     STRINGISE_ENUM_CLASS(CSInvocations);
+    // Begin L2 sungxu: Render pass GPU druation time.
+    STRINGISE_ENUM_CLASS(RenderPassGPUDuration);
+    STRINGISE_ENUM_CLASS(BeginRenderPassGPUDuration);
+    STRINGISE_ENUM_CLASS(EventGPUDurationDrawCalls);
+    STRINGISE_ENUM_CLASS(EventGPUDurationDispatches);
+    // End L2 sungxu
   }
   END_ENUM_STRINGISE();
 }

@@ -193,7 +193,12 @@ public:
   virtual rdcarray<GPUCounter> EnumerateCounters() = 0;
   virtual CounterDescription DescribeCounter(GPUCounter counterID) = 0;
   virtual rdcarray<CounterResult> FetchCounters(const rdcarray<GPUCounter> &counterID,
-                                                const rdcarray<uint8_t> &eventMask) = 0;
+                                            #if defined(POP_DEBUG)
+                                                const rdcarray<EventStatusFiltered> &eventMask,
+                                            #else
+                                                const rdcarray<uint8_t> &eventMask,
+                                            #endif
+                                                uint32_t Phase = 3) = 0;
 
   virtual void FillCBufferVariables(ResourceId pipeline, ResourceId shader, ShaderStage stage,
                                     rdcstr entryPoint, uint32_t cbufSlot,
